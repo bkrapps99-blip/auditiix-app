@@ -470,6 +470,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div class="divider"></div>
     </div>
     <div class="eyebrow" id="saved-sessions-heading">Sesi Tersimpan</div>
+    <input class="input" id="home-session-search" oninput="onHomeSessionSearch(this.value)" placeholder="Cari No. Evaluasi Kepatuhan, objek evaluasi kepatuhan, evaluator, standar, dsb..." style="margin-bottom:12px;">
     <div id="saved-sessions"></div>
   </div>
 
@@ -2078,6 +2079,8 @@ const APPROVAL_STATUS_MAP = {
   approved: {label:'DISETUJUI', cls:'approved'},
   finalized: {label:'SELESAI', cls:'ok'}
 };
+let homeSessionSearchTerm='';
+function onHomeSessionSearch(val){ homeSessionSearchTerm=val; refreshSavedSessions(); }
 async function refreshSavedSessions(){
   const box=document.getElementById('saved-sessions');
   if(!box || !currentUser) return;
@@ -2085,7 +2088,15 @@ async function refreshSavedSessions(){
   if(currentUser.role==='auditee'){
     all = all.filter(s=>s.auditeeUsername===currentUser.username);
   }
-  if(!all.length){ box.innerHTML='<div class="empty"><p>Belum ada sesi tersimpan.</p></div>'; return; }
+  const term=(homeSessionSearchTerm||'').trim().toLowerCase();
+  if(term){
+    all = all.filter(s=>{
+      const stdLabel = MASTER.standards[s.standard]?.shortLabel || s.standard || '';
+      return [s.nomor, s.unit, s.auditor, s.auditeeName, stdLabel, s.standard]
+        .some(v=>String(v||'').toLowerCase().includes(term));
+    });
+  }
+  if(!all.length){ box.innerHTML=`<div class="empty"><p>${term? 'Tidak ada sesi yang cocok dengan pencarian.' : 'Belum ada sesi tersimpan.'}</p></div>`; return; }
   all.sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
   box.innerHTML = all.map(s=>{
     const done=s.items.filter(i=>i.rating).length;
