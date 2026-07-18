@@ -1056,12 +1056,30 @@ async function deleteUserFromServer(username){
 }
 let standardsPushTimer=null;
 function scheduleStandardsPush(){
-  if(!syncConfigured() || !MASTER.accessToken || !currentUser || currentUser.role!=='admin') return;
+  if(!syncConfigured() || !currentUser || currentUser.role!=='admin') return;
   if(standardsPushTimer) clearTimeout(standardsPushTimer);
-  standardsPushTimer = setTimeout(async ()=>{
-    try{ await apiRequest('/master', {method:'PUT', body: JSON.stringify({standards: MASTER.standards})}); }
-    catch(e){ console.warn('[sync] push standar gagal', e); }
-  }, 2000);
+  standardsPushTimer = setTimeout(()=>{ pushStandardsNow(); }, 2000);
+}
+// Kirim standar ke server SEKARANG (bukan dijadwalkan), coba sambung ulang dulu kalau token
+// hilang/kadaluwarsa (mis. karena server sempat "tidur"), dan kembalikan hasil jujur
+// {ok:true} atau {ok:false, reason:'...'} — dipakai fitur Impor Standar supaya tidak
+// menampilkan "Berhasil" palsu saat sebenarnya gagal terkirim ke server.
+async function pushStandardsNow(){
+  if(!syncConfigured()) return {ok:false, reason:'mode-lokal'};
+  if(!MASTER.accessToken){
+    let reconnected=false;
+    if(currentUser){
+      const hist=(MASTER.loginHistory||[]).find(h=>h.username===currentUser.username);
+      if(hist) reconnected = await apiLogin(hist.username, hist.password);
+    }
+    if(!reconnected){ updateNetStatus(); return {ok:false, reason:'belum-tersambung'}; }
+  }
+  try{
+    const res = await apiRequest('/master', {method:'PUT', body: JSON.stringify({standards: MASTER.standards})});
+    updateNetStatus();
+    if(res.ok) return {ok:true};
+    return {ok:false, reason:'server-menolak ('+res.status+')'};
+  }catch(e){ return {ok:false, reason:'jaringan bermasalah'}; }
 }
 
 // Coba dapatkan nomor sesi resmi dari server (agar tidak bentrok antar perangkat saat online).
@@ -3184,7 +3202,18 @@ async function importStandardsFromJson(mode){
   ta.value='';
   renderStandardsManage();
   renderStandardChips();
-  toast('Berhasil: '+keys.length+' standar diterapkan ('+totalItems+' poin checklist).');
+
+  if(!syncConfigured()){
+    toast('Tersimpan lokal: '+keys.length+' standar ('+totalItems+' poin). Mode lokal — tidak ada server terhubung.');
+    return;
+  }
+  toast('Tersimpan lokal, mengirim ke server...');
+  const result = await pushStandardsNow();
+  if(result.ok){
+    toast('Berhasil: '+keys.length+' standar ('+totalItems+' poin) diterapkan & terkirim ke server.');
+  } else {
+    toast('⚠️ Tersimpan LOKAL saja, GAGAL terkirim ke server ('+result.reason+'). Buka Pengaturan > Sinkronisasi Server, klik "Sambungkan / Coba Lagi", lalu ulangi impor ini.');
+  }
 }
 async function updateStdMeta(key, field, value){
   value=value.trim();
