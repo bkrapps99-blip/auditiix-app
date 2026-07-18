@@ -268,9 +268,11 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 
 /* photo thumbs */
 .thumb-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
-.thumb{width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative;}
+.thumb{width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative;cursor:zoom-in;}
 .thumb img{width:100%;height:100%;object-fit:cover;}
-.thumb{cursor:zoom-in;}
+.thumb-badge{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--font-mono);color:#fff;display:flex;align-items:center;justify-content:center;line-height:1;}
+.thumb-badge-eval{background:#2E8B8B;}
+.thumb-badge-auditee{background:#C97A2B;}
 .photo-lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:32px;}
 .photo-lightbox.hidden{display:none;}
 .photo-lightbox img{max-width:100%;max-height:100%;border-radius:6px;object-fit:contain;}
@@ -786,6 +788,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
           </button>
         </div>
         <div id="fu-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
+        <div class="thumb-row" id="fu-thumbs"></div>
         <input class="input" id="fu-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
 
@@ -2212,7 +2215,7 @@ function openDetail(idx){
   document.getElementById('modal-duedate').value=it.dueDate||'';
   document.getElementById('modal-duedate-optional-tag').classList.toggle('hidden', it.rating!=='ofi');
   document.getElementById('modal-evidence-link').value=it.evidenceLink||'';
-  document.getElementById('modal-evidence-filename').textContent = it.evidenceFileName? '📎 '+it.evidenceFileName : '';
+  document.getElementById('modal-evidence-filename').innerHTML = renderEvidenceLink(it.evidenceFileName, it.evidenceFileData);
   document.getElementById('modal-detail').classList.remove('hidden');
   checkModalSaveEnabled();
 }
@@ -2237,7 +2240,12 @@ function closePhotoLightbox(){
 }
 function renderThumbs(){
   const it=state.items[activeItemIndex];
-  document.getElementById('modal-thumbs').innerHTML = (it.photos||[]).map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('');
+  const evalPhotos=(it.photos||[]).map(p=>({src:p, badge:'E', title:'Foto Evaluator'}));
+  const auditeePhotos=((it.followUp && it.followUp.photos) || []).map(p=>({src:p, badge:'P', title:'Foto Pemilik Proses'}));
+  const all=evalPhotos.concat(auditeePhotos);
+  document.getElementById('modal-thumbs').innerHTML = all.map(ph=>
+    `<div class="thumb" title="${ph.title}" onclick="openPhotoLightbox('${ph.src}')"><img src="${ph.src}"><span class="thumb-badge thumb-badge-${ph.badge==='E'?'eval':'auditee'}">${ph.badge}</span></div>`
+  ).join('');
 }
 function saveModal(){
   const it=state.items[activeItemIndex];
@@ -2259,7 +2267,7 @@ document.getElementById('modal-evidence-file').addEventListener('change', functi
     const it=state.items[activeItemIndex];
     it.evidenceFileData=ev.target.result;
     it.evidenceFileName=file.name;
-    document.getElementById('modal-evidence-filename').textContent='📎 '+file.name;
+    document.getElementById('modal-evidence-filename').innerHTML = renderEvidenceLink(file.name, ev.target.result);
     toast('Berkas bukti terlampir');
   };
   reader.readAsDataURL(file);
@@ -2432,9 +2440,9 @@ Catatan evaluasi evaluator: ${noteNow || '(tidak ada catatan tambahan)'}`;
 }
 
 /* ---------- Photo capture with watermark ---------- */
-document.getElementById('modal-photo-input').addEventListener('change', function(e){
-  const file=e.target.files[0];
-  if(!file) return;
+// Fungsi bersama: ambil file foto, gambar watermark (label + waktu + GPS), lalu panggil onDone(dataUrl).
+// label membedakan sumber foto, mis. "COMPLYSHIELD" (Evaluator) vs "PEMILIK PROSES" (Auditee).
+function capturePhotoWithWatermark(file, label, onDone){
   const img=new Image();
   const reader=new FileReader();
   reader.onload=function(ev){
@@ -2455,7 +2463,7 @@ document.getElementById('modal-photo-input').addEventListener('change', function
         ctx.font=`600 ${fs}px monospace`;
         const now=new Date();
         const ts=now.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'medium'});
-        ctx.fillText('COMPLYSHIELD · '+state.unit, 10, canvas.height-barH+fs+4);
+        ctx.fillText(label+' · '+state.unit, 10, canvas.height-barH+fs+4);
         ctx.fillStyle='#EAEFF1';
         ctx.font=`400 ${fs*0.85}px monospace`;
         ctx.fillText(ts, 10, canvas.height-barH+fs*2+8);
@@ -2465,11 +2473,7 @@ document.getElementById('modal-photo-input').addEventListener('change', function
           ctx.fillText('GPS: tidak tersedia', 10, canvas.height-barH+fs*3+12);
         }
         const dataUrl=canvas.toDataURL('image/jpeg',0.85);
-        state.items[activeItemIndex].photos.push(dataUrl);
-        dbPut(state);
-        renderThumbs();
-        renderChecklist();
-        toast('Foto tersimpan dengan watermark');
+        onDone(dataUrl);
       };
       if(navigator.geolocation){
         navigator.geolocation.getCurrentPosition(
@@ -2482,6 +2486,17 @@ document.getElementById('modal-photo-input').addEventListener('change', function
     img.src=ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+document.getElementById('modal-photo-input').addEventListener('change', function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  capturePhotoWithWatermark(file, 'COMPLYSHIELD', (dataUrl)=>{
+    state.items[activeItemIndex].photos.push(dataUrl);
+    dbPut(state);
+    renderThumbs();
+    renderChecklist();
+    toast('Foto tersimpan dengan watermark');
+  });
   e.target.value='';
 });
 
@@ -2519,7 +2534,8 @@ let fuActiveIdx=null, fuStatus='open';
 function openFollowUp(idx){
   fuActiveIdx=idx;
   const it=state.items[idx];
-  if(!it.followUp){ it.followUp={note:'',evidenceLink:'',evidenceFileName:'',evidenceFileData:'',status:'open',auditorResponse:'',history:[]}; }
+  if(!it.followUp){ it.followUp={note:'',evidenceLink:'',evidenceFileName:'',evidenceFileData:'',photos:[],status:'open',auditorResponse:'',history:[]}; }
+  if(!it.followUp.photos) it.followUp.photos=[];
   if(!it.followUp.history) it.followUp.history=[];
   const isAuditee = currentUser.role==='auditee';
   const agreed = state.approvalStatus==='approved' || state.approvalStatus==='finalized';
@@ -2549,7 +2565,8 @@ function openFollowUp(idx){
   linkEl.disabled=!isAuditee;
   document.getElementById('fu-btn-upload').style.display = isAuditee? 'flex':'none';
   document.getElementById('fu-btn-photo').style.display = isAuditee? 'flex':'none';
-  document.getElementById('fu-evidence-filename').textContent = it.followUp.evidenceFileName? '📎 '+it.followUp.evidenceFileName : (isAuditee? '' : 'Belum ada berkas bukti.');
+  document.getElementById('fu-evidence-filename').innerHTML = it.followUp.evidenceFileName? renderEvidenceLink(it.followUp.evidenceFileName, it.followUp.evidenceFileData) : (isAuditee? '' : 'Belum ada berkas bukti.');
+  renderFuThumbs();
 
   document.getElementById('fu-auditor-response-wrap').classList.toggle('hidden', currentUser.role!=='auditor');
   document.getElementById('fu-auditor-response').value = it.followUp.auditorResponse||'';
@@ -2576,6 +2593,11 @@ function setFuStatus(s){
   fuStatus=s;
   document.querySelectorAll('[data-fu-status]').forEach(c=>c.classList.toggle('active', c.dataset.fuStatus===s));
 }
+function renderFuThumbs(){
+  const it=state.items[fuActiveIdx];
+  const photos=(it && it.followUp && it.followUp.photos) || [];
+  document.getElementById('fu-thumbs').innerHTML = photos.map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('');
+}
 function closeFollowUp(){ document.getElementById('modal-followup').classList.add('hidden'); }
 document.getElementById('fu-evidence-file').addEventListener('change', function(e){
   const file=e.target.files[0];
@@ -2586,7 +2608,7 @@ document.getElementById('fu-evidence-file').addEventListener('change', function(
     const it=state.items[fuActiveIdx];
     it.followUp.evidenceFileData=ev.target.result;
     it.followUp.evidenceFileName=file.name;
-    document.getElementById('fu-evidence-filename').textContent='📎 '+file.name;
+    document.getElementById('fu-evidence-filename').innerHTML = renderEvidenceLink(file.name, ev.target.result);
     toast('Berkas bukti terlampir');
   };
   reader.readAsDataURL(file);
@@ -2595,16 +2617,14 @@ document.getElementById('fu-evidence-file').addEventListener('change', function(
 document.getElementById('fu-evidence-photo').addEventListener('change', function(e){
   const file=e.target.files[0];
   if(!file) return;
-  if(file.size > 4*1024*1024){ toast('Ukuran berkas maksimal 4MB'); e.target.value=''; return; }
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    const it=state.items[fuActiveIdx];
-    it.followUp.evidenceFileData=ev.target.result;
-    it.followUp.evidenceFileName=file.name;
-    document.getElementById('fu-evidence-filename').textContent='📎 '+file.name;
-    toast('Foto bukti terlampir');
-  };
-  reader.readAsDataURL(file);
+  const it=state.items[fuActiveIdx];
+  if(!it.followUp.photos) it.followUp.photos=[];
+  capturePhotoWithWatermark(file, 'PEMILIK PROSES', (dataUrl)=>{
+    it.followUp.photos.push(dataUrl);
+    dbPut(state);
+    renderFuThumbs();
+    toast('Foto bukti tersimpan dengan watermark');
+  });
   e.target.value='';
 });
 async function saveFollowUp(){
@@ -3330,6 +3350,12 @@ function escapeHtml(str){
 // tetap tampil di baris terpisah, tidak menyambung jadi satu paragraf.
 function nl2br(str){
   return escapeHtml(str).replace(/\n/g,'<br>');
+}
+// Menampilkan nama berkas bukti sebagai tautan yang bisa diklik untuk dibuka/disimpan,
+// bukan sekadar teks nama file.
+function renderEvidenceLink(fileName, fileData){
+  if(!fileName || !fileData) return '';
+  return `<a href="${fileData}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;cursor:pointer;">📎 ${escapeHtml(fileName)}</a>`;
 }
 
 function toggleStdCard(key){
