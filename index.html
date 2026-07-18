@@ -2283,6 +2283,40 @@ async function callAI(prompt){
 
   throw new Error('NO_AI_CONFIGURED');
 }
+// Menyusun teks final "Agar .... Eviden: ..." dari jawaban AI, supaya formatnya SELALU konsisten
+// walau AI tidak selalu patuh 100% pada instruksi JSON (model AI kadang tetap menyelipkan
+// teks tambahan atau lupa strukturnya) — aplikasi yang merapikan, bukan mengandalkan AI.
+function formatRekomendasiAgarEviden(raw){
+  let tindakan='', eviden='', parsed=null;
+  try{
+    const cleaned=String(raw).replace(/```json|```/gi,'').trim();
+    const match=cleaned.match(/\{[\s\S]*\}/);
+    parsed=JSON.parse(match? match[0] : cleaned);
+  }catch(e){ parsed=null; }
+
+  if(parsed && typeof parsed.tindakan==='string'){
+    tindakan=parsed.tindakan.trim();
+    eviden=(parsed.eviden||'').trim();
+  } else {
+    tindakan=String(raw).replace(/```json|```/gi,'').trim();
+    const evIdx=tindakan.search(/eviden\s*:/i);
+    if(evIdx>=0){
+      eviden=tindakan.slice(evIdx).replace(/^eviden\s*:\s*/i,'').trim();
+      tindakan=tindakan.slice(0,evIdx).trim();
+    }
+  }
+
+  tindakan=tindakan.replace(/^agar\s+/i,'').trim();
+  if(tindakan) tindakan=tindakan.charAt(0).toLowerCase()+tindakan.slice(1);
+  const endWithDot=(s)=> (s && !/[.!?]$/.test(s)) ? s+'.' : s;
+  tindakan=endWithDot(tindakan);
+  eviden=eviden.replace(/^eviden\s*:\s*/i,'').trim();
+  eviden=endWithDot(eviden);
+
+  let result='Agar '+tindakan;
+  if(eviden) result+=' Eviden: '+eviden;
+  return result.trim();
+}
 async function generateRecommendation(isRefresh){
   const it=state.items[activeItemIndex];
   const btn=document.getElementById('btn-ai-generate');
@@ -2293,24 +2327,20 @@ async function generateRecommendation(isRefresh){
   const originalBtnHtml=btn.innerHTML;
   btn.innerHTML='<span>Menganalisis…</span>'; btn.disabled=true; refreshLink.style.opacity=0.5; refreshLink.style.pointerEvents='none';
   try{
-    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan SATU rekomendasi tindakan korektif dalam Bahasa Indonesia yang detail dan tidak menimbulkan salah paham bagi Pemilik Proses yang akan menindaklanjuti.
+    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan SATU rekomendasi tindakan korektif dalam Bahasa Indonesia yang detail, spesifik, dan tidak menimbulkan salah paham bagi Pemilik Proses yang akan menindaklanjuti.
 
-WAJIB dalam 2 kalimat dengan format persis seperti ini:
-1. Kalimat pertama: perintah tindakan yang SPESIFIK dan actionable — sebutkan apa yang harus dilakukan, objek/lokasi persisnya (ambil dari klausul/catatan evaluator, jangan mengarang lokasi baru), dan jelas untuk siapa saja yang membaca tanpa perlu bertanya balik. Awali dengan "Agar segera..." atau "Agar dilakukan...".
-2. Kalimat kedua: WAJIB diawali kata "Eviden: " lalu sebutkan bukti konkret yang harus dilampirkan Pemilik Proses untuk menutup temuan ini (mis. foto, dokumen, sertifikat, hasil uji, dsb — sesuai konteks klausul).
-
-Contoh format yang benar: "Agar segera mencetak dan memasang diagram SLD di ruang CCR. Eviden: Bukti pemasangan SLD di ruang CCR."
-
-Jangan tambahkan kalimat pembuka/penutup lain di luar 2 kalimat wajib itu.
+Balas HANYA dengan JSON valid (tanpa markdown code fence, tanpa teks lain di luar JSON), persis struktur berikut:
+{"tindakan": "kalimat perintah tindakan yang spesifik dan actionable, sebutkan objek/lokasi persis dari klausul/catatan (jangan mengarang lokasi baru), TANPA kata 'Agar' di awal karena akan ditambahkan otomatis", "eviden": "bukti konkret yang harus dilampirkan Pemilik Proses untuk menutup temuan ini, mis. foto/dokumen/sertifikat/hasil uji sesuai konteks klausul"}
 
 Klausul: ${it.code} — ${it.text}
 Tingkat evaluasi: ${ratingLabel}
 Catatan evaluasi evaluator: ${noteNow || '(tidak ada catatan tambahan)'}`;
     if(isRefresh && ta.value.trim()){
-      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap ikuti format 2 kalimat wajib (tindakan + "Eviden: ...") di atas.`;
+      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap balas dalam format JSON {"tindakan":"...","eviden":"..."} di atas.`;
     }
-    const text = await callAI(prompt);
-    if(!text) throw new Error('empty response');
+    const raw = await callAI(prompt);
+    if(!raw) throw new Error('empty response');
+    const text = formatRekomendasiAgarEviden(raw);
     ta.value=text;
     toast(isRefresh? 'Alternatif rekomendasi dibuat':'Rekomendasi AI dibuat');
   }catch(e){
