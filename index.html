@@ -2293,13 +2293,21 @@ async function generateRecommendation(isRefresh){
   const originalBtnHtml=btn.innerHTML;
   btn.innerHTML='<span>Menganalisis…</span>'; btn.disabled=true; refreshLink.style.opacity=0.5; refreshLink.style.pointerEvents='none';
   try{
-    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan SATU rekomendasi tindakan korektif yang singkat, spesifik, dan actionable dalam Bahasa Indonesia (maksimal 2-3 kalimat). Langsung tulis isi rekomendasinya saja, tanpa kalimat pembuka atau penutup.
+    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan SATU rekomendasi tindakan korektif dalam Bahasa Indonesia yang detail dan tidak menimbulkan salah paham bagi Pemilik Proses yang akan menindaklanjuti.
+
+WAJIB dalam 2 kalimat dengan format persis seperti ini:
+1. Kalimat pertama: perintah tindakan yang SPESIFIK dan actionable — sebutkan apa yang harus dilakukan, objek/lokasi persisnya (ambil dari klausul/catatan evaluator, jangan mengarang lokasi baru), dan jelas untuk siapa saja yang membaca tanpa perlu bertanya balik. Awali dengan "Agar segera..." atau "Agar dilakukan...".
+2. Kalimat kedua: WAJIB diawali kata "Eviden: " lalu sebutkan bukti konkret yang harus dilampirkan Pemilik Proses untuk menutup temuan ini (mis. foto, dokumen, sertifikat, hasil uji, dsb — sesuai konteks klausul).
+
+Contoh format yang benar: "Agar segera mencetak dan memasang diagram SLD di ruang CCR. Eviden: Bukti pemasangan SLD di ruang CCR."
+
+Jangan tambahkan kalimat pembuka/penutup lain di luar 2 kalimat wajib itu.
 
 Klausul: ${it.code} — ${it.text}
 Tingkat evaluasi: ${ratingLabel}
 Catatan evaluasi evaluator: ${noteNow || '(tidak ada catatan tambahan)'}`;
     if(isRefresh && ta.value.trim()){
-      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap relevan dan actionable.`;
+      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap ikuti format 2 kalimat wajib (tindakan + "Eviden: ...") di atas.`;
     }
     const text = await callAI(prompt);
     if(!text) throw new Error('empty response');
