@@ -865,7 +865,7 @@ async function dbDelete(id){
     return new Promise((res)=>{
       const tx=db.transaction('sessions','readwrite');
       tx.objectStore('sessions').delete(id);
-      tx.oncomplete=()=>{ deleteSessionFromServer(id); res(true); };
+      tx.oncomplete=()=>res(true);
       tx.onerror=()=>res(false);
     });
   }catch(e){ return false; }
@@ -1024,8 +1024,21 @@ function markNotificationDirty(id){
   scheduleSync();
 }
 async function deleteSessionFromServer(id){
-  if(!syncConfigured() || !MASTER.accessToken) return;
-  try{ await apiRequest('/sessions/'+encodeURIComponent(id), {method:'DELETE'}); }catch(e){ console.warn('[sync] hapus sesi di server gagal', e); }
+  if(!syncConfigured()) return {ok:false, reason:'mode-lokal'};
+  if(!MASTER.accessToken){
+    let reconnected=false;
+    if(currentUser){
+      const hist=(MASTER.loginHistory||[]).find(h=>h.username===currentUser.username);
+      if(hist) reconnected = await apiLogin(hist.username, hist.password);
+    }
+    if(!reconnected){ updateNetStatus(); return {ok:false, reason:'belum-tersambung'}; }
+  }
+  try{
+    const res = await apiRequest('/sessions/'+encodeURIComponent(id), {method:'DELETE'});
+    updateNetStatus();
+    if(res.ok) return {ok:true};
+    return {ok:false, reason:'server-menolak ('+res.status+')'};
+  }catch(e){ return {ok:false, reason:'jaringan bermasalah'}; }
 }
 // Tulis/hapus langsung ke IndexedDB TANPA menandai dirty & TANPA memberi tahu server balik —
 // dipakai khusus saat menerapkan data yang baru ditarik (pull) dari server, supaya tidak
@@ -2071,8 +2084,17 @@ async function deleteSession(id){
       state={id:null, nomor:null, unit:'', standard:'', auditor:'', auditorUsername:'', createdAt:null, items:[], auditeeUsername:'', auditeeName:'', sigAuditor:null, sigAuditee:null, closed:false, approvalStatus:'draft', sentForApprovalAt:null, approvedAt:null, followUpReport:null, closingLog:[]};
       document.getElementById('unit-label').textContent='PILIH UNIT EVALUASI KEPATUHAN';
     }
-    toast('Sesi dihapus');
     refreshSavedSessions();
+    if(!syncConfigured()){
+      toast('Sesi dihapus (mode lokal, tidak ada server terhubung).');
+    } else {
+      const result = await deleteSessionFromServer(id);
+      if(result.ok){
+        toast('Sesi dihapus & terhapus juga di server.');
+      } else {
+        toast('⚠️ Sesi terhapus LOKAL saja, GAGAL terhapus di server ('+result.reason+'). Buka Pengaturan > Sinkronisasi Server, "Sambungkan / Coba Lagi", lalu hapus lagi kalau sesi ini masih muncul di perangkat lain.');
+      }
+    }
   });
 }
 async function printSessionReport(id){
