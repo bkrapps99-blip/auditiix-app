@@ -584,6 +584,17 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <button class="btn btn-teal" onclick="addStandard()">Tambah Standar</button>
     </div>
 
+    <div class="card" style="margin-bottom:18px;">
+      <div style="font-weight:600;font-size:13.5px;margin-bottom:6px;">⇪ Impor Standar dari JSON</div>
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.6;margin:0 0 10px;">Untuk mengganti/menambah banyak standar & poin checklist sekaligus (mis. hasil susunan dari Excel). Tempel data JSON di bawah, lalu pilih mode.</p>
+      <textarea class="input" id="std-import-json" rows="6" style="font-family:var(--font-mono);font-size:11.5px;resize:vertical;" placeholder='{"ops":{"shortLabel":"OPS","name":"OPERASI PLTA","items":[{"code":"OPS-A.1","text":"..."}]}}'></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button class="btn btn-teal btn-sm" onclick="importStandardsFromJson('replace')">Ganti Semua Standar</button>
+        <button class="btn btn-sm" onclick="importStandardsFromJson('merge')">Tambahkan/Timpa Sebagian</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-faint);line-height:1.6;margin:10px 0 0;">"Ganti Semua" menghapus seluruh standar lama lalu memakai isi JSON ini saja. "Tambah/Timpa Sebagian" hanya menambah standar baru atau menimpa standar yang kodenya sama, standar lain yang tidak disebut tetap ada.</p>
+    </div>
+
     <div id="standards-manage-list"></div>
   </div>
 
@@ -1150,35 +1161,226 @@ function refreshSyncPanel(){
 
 /* ---------- Default master data (seed on first run; fully editable afterwards) ---------- */
 const DEFAULT_STANDARDS = {
-  iso45001: {shortLabel:"ISO 45001 (K3)", name:"ISO 45001 — Keselamatan & Kesehatan Kerja", items:[
-    {code:"6.1.2", text:"Identifikasi bahaya pada area kerja pembangkit telah dilakukan dan didokumentasikan (HIRADC terkini)."},
-    {code:"7.2", text:"Personel yang bekerja di area berisiko tinggi (turbin, panel listrik) memiliki kompetensi/sertifikasi K3 yang berlaku."},
-    {code:"8.1.2", text:"Alat Pelindung Diri (APD) tersedia, layak pakai, dan digunakan sesuai area kerja."},
-    {code:"8.1.2", text:"Alat Pemadam Api Ringan (APAR) tersedia sesuai jumlah/lokasi wajib, dalam kondisi baik dan belum kedaluwarsa."},
-    {code:"8.2", text:"Prosedur kesiapsiagaan tanggap darurat (kebakaran, banjir bendungan) tersedia dan disosialisasikan."},
-    {code:"9.1.1", text:"Pemeriksaan berkala terhadap alat angkat-angkut dan alat kerja bertekanan telah dilakukan sesuai jadwal."},
-    {code:"6.1.3", text:"Rambu K3 dan jalur evakuasi di area pembangkit terpasang jelas dan tidak terhalang."},
+  "ops": {shortLabel:"OPS", name:"OPERASI PLTA", items:[
+    {code:"OPS-A.1", text:"Single Line Diagram (SLD): Terdapat diagram satu garis instalasi listrik untuk memudahkan pemahaman alur distribusi dan manuver sistem."},
+    {code:"OPS-A.2", text:"Diagram Alir (Piping & Instrumentation Diagram - P&ID): Terdapat P&ID khusus untuk sisi mekanis/proses guna memantau aliran fluida dan sistem kontrol."},
+    {code:"OPS-A.3", text:"Instruksi Kerja/Prosedur Operasional & Kondisi Darurat (Emergency): Tersedia instruksi kerja/prosedur operasional standar (start/stop/pembebanan/manuver unit) serta untuk kondisi darurat (emergency shutdown)."},
+    {code:"OPS-A.4", text:"Peta Jalur Evakuasi & Titik Kumpul: Terdapat peta jalur evakuasi (penyelamatan) menuju titik kumpul (assembly point)."},
+    {code:"OPS-A.5", text:"Daftar Kontak Darurat (Internal & Eksternal): Terdapat daftar kontak pemadam kebakaran, fasilitas kesehatan terdekat, manajemen, dan tim tanggap darurat internal."},
+    {code:"OPS-B.1", text:"Daftar Pekerjaan: Terdapat daftar pekerjaan yang sedang berlangsung serta status isolasi peralatan untuk mencegah aktivasi yang tidak disengaja."},
+    {code:"OPS-B.2", text:"Sarana Prasarana LOTO (Lock Out Tag Out): Terdapat sarana prasarana LOTO lengkap di Ruang CCR serta berfungsi dengan baik."},
+    {code:"OPS-B.3", text:"Prosedur Pengendalian Risiko Operasi: Terdapat IK Isolasi Peralatan atau Permit to Work (PTW) beserta Form PTW nya."},
+    {code:"OPS-B.4", text:"Monitoring PTW: Terdapat bukti pengecekan/clearance test hasil pekerjaan sebelum restorasi peralatan (pekerjaan dinyatakan selesai)."},
+    {code:"OPS-B.5", text:"Zero Accident: Tidak terjadi kecelakaan kerja yang diakibatkan kesalahan pengoperasian, dibuktikan telah memiliki piagam penghargaan zero accident untuk tahun berjalan sebagai bukti continuous improvement konsistensi pelaksanaan PTW."},
+    {code:"OPS-B.6", text:"Risk Register Operasi: Risiko operasional seperti dam break, kekurangan energi primer, sedimentasi tinggi, banjir ekstrem atau kondisi darurat lainnya yang bisa berdampak terhadap operasional Unit Pembangkit sudah di mitigasi."},
+    {code:"OPS-C.1", text:"Matriks Kompetensi & SKTTK Operator/Helper CCR: Terdapat daftar nama operator/helper CCR yang sedang bertugas beserta klasifikasi kompetensi dan Sertifikat Kompetensi Tenaga Teknik Ketenagalistrikan (SKTTK) yang masih berlaku."},
+    {code:"OPS-C.2", text:"Sertifikat Laik Operasi (SLO): Terdapat salinan atau informasi mengenai nomor SLO yang masih berlaku untuk instalasi pembangkit tersebut."},
+    {code:"OPS-D.1", text:"Pengendalian Instruksi Kerja/Prosedur: Instruksi kerja/prosedur Start-Stop Unit dan Emergency Procedure telah di-review dan divalidasi pejabat terkait minimal 1 tahun sekali."},
+    {code:"OPS-D.2", text:"Kalibrasi Alat Ukur: Instrumen alat ukur operasi (Manometer, Level Air, KwH-meter, dsb) memiliki riwayat dan sertifikat kalibrasi yang masih berlaku."},
+    {code:"OPS-D.3", text:"Manajemen Aset (EAF/EFOR): Data gangguan operasional telah dicatat secara akurat di sistem EAM (SIT-Ellipse)."},
+    {code:"OPS-D.4", text:"Sasaran Mutu (KPI): Target produksi (KWh) dan pemakaian sendiri (PS) tercapai sesuai target kinerja."},
+    {code:"OPS-E.1", text:"Formulir Patrol Check: Telah terdapat formulir (log sheet) patrol check yang lengkap serta pengisian data operasional dilakukan tepat waktu (per jam) tanpa ada data kosong/fiktif."},
+    {code:"OPS-E.2", text:"Pelaksanaan Patrol Check: Patrol Check dilakukan minimal 2 (dua) kali setiap shift, setelah tukar shift dan sebelum tukar shift."},
+    {code:"OPS-E.3", text:"Validasi Recording Data Operasi: Log sheet hasil patrol check telah divalidasi oleh Asman/TL PLTA."},
+    {code:"OPS-E.4", text:"Monitoring Gangguan & Penormalan: Update ILS/WR (ketidaknormalan hasil patrol check) di-monitor rutin (progress tindak lanjut)."},
+    {code:"OPS-E.5", text:"Deskripsi Incident Log Sheet (ILS) & Work Request (WR): Seluruh deskripsi ILS/WR sudah tertulis jelas, deskripsi kerusakan yang jelas, serta telah di-state priority ILS/WR (normal, urgent, emergency)."},
+    {code:"OPS-E.6", text:"Jadwal Rutin Work: Telah terdapat jadwal rutin work yang mengacu pada manual book (manual book tersedia sebagai acuan)."},
+    {code:"OPS-E.7", text:"Formulir Rutin Work: Telah terdapat formulir change over, formulir test peralatan, serta formulir rutin operasi beserta hasil pelaksanaannya sesuai IK yang berlaku (dokumen IK tersedia sebagai acuan kegiatan)."},
+    {code:"OPS-E.8", text:"Pelaksanaan Meeting Operasi & Monitoring Kesiapan Peralatan: Telah terdapat formulir/log sheet shift meeting, serta shift meeting telah konsisten dilaksanakan."},
+    {code:"OPS-E.9", text:"Notulen Meeting Operasi: Notulen shift meeting telah memasukkan informasi: agenda, rencana, aktivitas shift sebelumnya, pembahasan/status ILS/WR yang terbit, serta informasi peralatan FPS (Fire Protection System) beserta impairment nya apabila terdapat kondisi FPS tidak siap."},
+    {code:"OPS-E.10", text:"Prosedur Penanganan Gangguan Unit: Telah terdapat prosedur/IK start/stop, IK penanganan gangguan unit, IK gangguan system/blackout system yang berada di dekat peralatan/Ruang CCR Unit."},
+    {code:"OPS-E.11", text:"Prosedur Pelaporan Gangguan Unit: Telah terdapat prosedur/IK komunikasi pelaporan gangguan."},
+    {code:"OPS-E.12", text:"Formulir & Bukti Pelaporan Gangguan Unit: Telah terdapat formulir/jurnal gangguan serta bukti pelaporan ke Operator NuCC/ROC maksimal 15 menit setelah terjadi gangguan (jika ada gangguan)."},
+    {code:"OPS-E.13", text:"Simulasi Penanganan Gangguan Unit: Telah dilakukan simulasi penanganan gangguan system/blackout system/manuver unit sebagai langkah pengamanan unit dan alat bantu bagi Helper CCR."},
+    {code:"OPS-E.14", text:"Jadwal House Keeping (5S) Area Produksi: Telah terdapat jadwal, pembagian area, & PIC 5S."},
+    {code:"OPS-E.15", text:"Jadwal First Line Maintenance (FLM) Peralatan Produksi: Telah terdapat jadwal FLM yang bersifat preventif (bersihkan, kencangkan & lumasi) => PM 7D Operator."},
+    {code:"OPS-E.16", text:"Sarana Prasarana First Line Maintenance (FLM): Telah terdapat perlengkapan FLM yang memadai di Ruang CCR."},
+    {code:"OPS-E.17", text:"Dokumentasi First Line Maintenance (FLM) & House Keeping (5S): Konsisten melaksanakan dokumentasi kegiatan FLM & 5S (foto sebelum & sesudah)."},
+    {code:"OPS-E.18", text:"Implementasi House Keeping (5S) Area Produksi: Area CCR, Ruang EDG, Ruang Battery, serta power house bersih dari ceceran oli dan barang tidak terpakai."},
+    {code:"OPS-F.1", text:"Struktur Organisasi Tanggap Darurat: Terdapat penanggung jawab komando (organisasi tanggap darurat) saat terjadi keadaan darurat di Unit Pembangkit."},
+    {code:"OPS-F.2", text:"Ketersediaan APD: Ketersediaan APD di Ruang CCR dan operator selalu menggunakan APD lengkap (Helm, Sepatu Safety, Earplug) saat patrol check dan berada di area bising."},
+    {code:"OPS-F.3", text:"Kesiagaan EDG (Emergency Diesel Generator): Uji coba beban (load test) dilakukan rutin dan unit sanggup Black Start."},
+    {code:"OPS-F.4", text:"Keamanan Bendungan/KTH (Dam Safety): Pemantauan instrumen bendungan (rembesan, pergerakan, tekanan & beban, hidrologi & seismik) rutin dilakukan."},
   ]},
-  iso9001: {shortLabel:"ISO 9001 (Mutu)", name:"ISO 9001 — Sistem Manajemen Mutu", items:[
-    {code:"7.1.5", text:"Alat ukur/instrumen operasional (meter, sensor) terkalibrasi sesuai jadwal dan memiliki sertifikat kalibrasi."},
-    {code:"8.5.1", text:"Prosedur operasi standar (SOP) untuk kegiatan pemeliharaan tersedia, terkini, dan mudah diakses operator."},
-    {code:"8.7", text:"Produk/output tidak sesuai (deviasi kinerja pembangkit) ditangani dan didokumentasikan sesuai prosedur."},
-    {code:"9.1.3", text:"Data kinerja (NKO/Konkin) dianalisis secara berkala untuk perbaikan berkelanjutan."},
-    {code:"7.5.3", text:"Dokumen terkendali (SOP, IK) tersedia dalam versi terbaru di lokasi kerja."},
+  "har": {shortLabel:"HAR", name:"PEMELIHARAAN PLTA", items:[
+    {code:"HAR-A.1", text:"Prioritisasi & Pelaksanaan PM: Terdapat schedulling PM mingguan di PLTA."},
+    {code:"HAR-A.2", text:"Prioritisasi & Pelaksanaan PM: Terdapat bukti pelaksanaan WO PM sesuai schedule (jadwal)."},
+    {code:"HAR-A.3", text:"PM Compliance: 100% seluruh pekerjaan PM bulanan selesai atau closed tepat waktu (actual finish dalam range schedule start dan schedule finish)."},
+    {code:"HAR-A.4", text:"PM Compliance: 100% data completion lengkap serta realisasi manhours dibandingkan dengan total jumlah pekerjaan PM closed."},
+    {code:"HAR-A.5", text:"PM Compliance: 100% completion comment serta dispatch assignment yang merupakan feedback dari pelaksanaan pekerjaan lengkap diisi."},
+    {code:"HAR-B.2", text:"Identifikasi Pekerjaan: PLTA rutin bersama Bagian Rendal Har melakukan job site visit semua pekerjaan (tidak hanya untuk pekerjaan urgent)."},
+    {code:"HAR-B.3", text:"Identifikasi Pekerjaan: Seluruh job card telah dilengkapi perintah safety generic serta referensi safety terkait task yang dilakukan (JSEA)."},
+    {code:"HAR-C.1", text:"Daily & Weekly Schedulling: Khusus untuk WR terkadang masih ada kalimat / deskripsi yang masih kurang jelas. Deskripsi WR agar diperbaiki terkait deskripsi kerusakan yang jelas, serta ditambahkan priority WR (normal, urgent, Emergency)"},
+    {code:"HAR-C.2", text:"Daily & Weekly Schedulling: PLTA telah konsisten mengikuti daily meeting Bagian Rendal Har serta hadir tepat waktu maksimal pukul 08.15 WIB."},
+    {code:"HAR-C.3", text:"Daily & Morning Meeting: PLTA telah konsisten melakukan pengisian dan mengirimkan formulir daily meeting tepat waktu."},
+    {code:"HAR-C.4", text:"Daily & Morning Meeting: PLTA telah konsisten melaksanakan morning meeting PLTA sebagai dasar input-an untuk daily meeting Rendal Har."},
+    {code:"HAR-C.5", text:"Daily & Morning Meeting: Seluruh fungsi di PLTA telah konsisten mengikuti morning meeting PLTA."},
+    {code:"HAR-C.6", text:"Resources Smoothing: Telah konsisten menyampaikan ketersediaan resources maksimal hari Selasa jam 08.00 WIB."},
+    {code:"HAR-D.2", text:"Eksekusi Pekerjaan: Job card telah dimasukkan/di-input ke dalam EAM (SIT-Ellipse) yang berisi Feedback Report (FBR)."},
+    {code:"HAR-D.3", text:"Eksekusi Pekerjaan: Setelah selesai pekerjaan, telah konsisten dilakukan post maintenance testing dan melakukan serah terima pekerjaan dengan Operator/Helper CCR (penandatanganan job card)."},
+    {code:"HAR-D.4", text:"Eksekusi Pekerjaan: Asman/TL PLTA secara rutin membuat laporan pemeliharaan sebagai executive summary di bidangnya (maksimal tanggal 10 setiap bulan)."},
+    {code:"HAR-D.5", text:"Eksekusi Pekerjaan: Kondisi peralatan PLTA setelah dilakukan PM konsisten dilakukan pembersihan."},
+    {code:"HAR-D.6", text:"Eksekusi Pekerjaan: Emergency Diesel Generator (EDG) rutin dilakukan PM (dibuktikan dengan pengisian job card PM, kartu gantung, & visual area)."},
+    {code:"HAR-D.7", text:"Eksekusi Pekerjaan: Battery Unit rutin dilakukan PM (dibuktikan dengan pengisian job card PM, kartu gantung, & visual area)."},
+    {code:"HAR-D.8", text:"Kelengkapan Alat & Prosedur Safety: Peralatan safety untuk alat pelindung diri (APD) dan peralatan isolasi lengkap serta berfungsi dengan baik."},
+    {code:"HAR-D.9", text:"Kelengkapan Alat & Prosedur Safety: 100% WO yang terbit telah dilengkapi dengan JSEA yang dikeluarkan oleh K3/Rendal Har dan ditandatangani oleh pejabat yang terkait sesuai prosedur."},
+    {code:"HAR-D.10", text:"Kelengkapan Alat & Prosedur Safety: Saat ada pekerjaan pemeliharaan, isolasi peralatan sudah dilakukan dengan baik dan diberi tagging di CCR maupun Lokal."},
+    {code:"HAR-D.11", text:"Kelengkapan Alat & Prosedur Safety: Sudah terdapat prosedur (IK) isolasi peralatan yang berdasarkan \"manual operasi-pemeliharaan\" ter-update, serta dituangkan dalam formulir isolasi peralatan yang ditandatangani oleh pejabat yang terkait sesuai prosedur tersebut."},
+    {code:"HAR-E.1", text:"Updating Work Order (WO): Konsistensi update WO, setelah selesai pekerjaan WO langsung di-closed."},
+    {code:"HAR-E.2", text:"Updating Work Order (WO): Tidak terdapat WO Backlog Emergency Maintenance (dalam 48 jam harus selesai)."},
+    {code:"HAR-E.3", text:"Updating Work Order (WO): Terdapat dokumen workflow bisnis proses WPC Management sebagai panduan/kontrol/pengendalian pelaksanaan pekerjaan di Unit."},
+    {code:"HAR-E.4", text:"Updating Work Order (WO): Konsistensi material ex-used hasil penggantian saat pekerjaan pemeliharaan telah dikembalikan ke gudang (syarat WO Closed: material ex-used sudah dikembalikan ke gudang serta tercatat)."},
+    {code:"HAR-F.1", text:"Pengendalian Instruksi Kerja/Prosedur: Instruksi kerja/prosedur Pemeliharaan Unit (PM, CM, EM) telah di-review & divalidasi pejabat terkait minimal 1 tahun sekali."},
+    {code:"HAR-F.2", text:"Pengendalian Instruksi Kerja/Prosedur: Instruksi kerja/prosedur Pemeliharaan Unit (PM, CM, EM) ter-update telah tersedia di dekat masing-masing peralatan."},
+    {code:"HAR-F.3", text:"Kalibrasi Alat Ukur: Alat ukur pemeliharaan unit (Manometer/Pressure Gauge, Flow Meter, Tachometer/Speed Sensor, Avometer, Megger, Infrared Thermometer, Thermal Camera, dsb) memiliki riwayat dan sertifikat kalibrasi yang masih berlaku."},
+    {code:"HAR-F.4", text:"Sasaran Mutu (KPI): Realisasi EAF & EFOR tercapai sesuai target kontrak kinerja PLTA dari manajemen."},
+    {code:"HAR-F.5", text:"Housekeeping (5S): Area Bengkel, Ruang Tools, Ruang Teknisi Pemeliharaan tertata rapi, serta bersih dari ceceran oli dan barang tidak terpakai."},
   ]},
-  iso14001: {shortLabel:"ISO 14001 (Lingkungan)", name:"ISO 14001 — Sistem Manajemen Lingkungan", items:[
-    {code:"6.1.2", text:"Aspek lingkungan penting (limbah oli, kebisingan, kualitas air keluaran) teridentifikasi dan dikendalikan."},
-    {code:"8.1", text:"Penyimpanan limbah B3 (oli bekas, majun terkontaminasi) sesuai ketentuan (TPS berizin, label, masa simpan)."},
-    {code:"9.1.1", text:"Pemantauan kualitas air/lingkungan sekitar bendungan dilakukan sesuai jadwal dan hasil terdokumentasi."},
-    {code:"8.2", text:"Kesiapan tanggap darurat lingkungan (tumpahan oli/bahan kimia) tersedia lengkap dengan sarana penanggulangan."},
+  "k3": {shortLabel:"K3", name:"MANAJEMEN K3 PLTA", items:[
+    {code:"K3-A.1", text:"Kebijakan/Komitmen Manajemen K3 Tersedia: Dokumen kebijakan/komitmen ditandatangani pimpinan Unit Pembangkitan (SM) dan masih berlaku."},
+    {code:"K3-A.2", text:"Kebijakan/Komitmen Manajemen K3 Disosialisasikan: Kebijakan/komitmen disosialisasikan kepada seluruh workforce di Unit PLTA agar memahami kebijakan/komitmen manajemen K3 yang telah ditetapkan."},
+    {code:"K3-B.1", text:"Prosedur Penerbitan Working Permit, Safety Permit & JSEA: Telah tersedia prosedur (SOP/IK) penerbitan working permit, safety permit, & Job Safety Environment Analysis (JSEA) di Unit PLTA."},
+    {code:"K3-B.2", text:"Monitoring Working Permit, Safety Permit, & JSEA: Petugas K3 Unit PLTA telah melakukan monitoring working permit/safety permit/JSEA yang terbit untuk seluruh pekerjaan di area PLTA, termasuk high risk working permit - golden rules."},
+    {code:"K3-B.3", text:"Job Safety Observation (JSO) dan Live Audit: Unit telah melaksanakan JSO pada setiap awal pekerjaan serta konsisten melaksanakan live-audit untuk setiap pekerjaan yang telah diterbitkan permit-nya, termasuk live audit untuk high risk working permit - golden rules."},
+    {code:"K3-B.4", text:"Kesiapan Fire Protection & Detection System: Telah dilakukan pemeriksaan rutin kesiapan serta kesesuaian FP&D System yang terpasang di Unit PLTA, antara lain: Alat Pemadam Api Tradisional (APAR); Alat Pemadam Api Ringan (APAR); Gas Suppression System (GSS); Fire Alarm Control Panel (FACP); CO² Fire Suppression System; Deluge System; & Hydrant System."},
+    {code:"K3-B.5", text:"Prosedur Pengendalian Fire Protection & Detection System: Telah tersedia Prosedur (SOP/IK) Pengendalian Fire Protection dan Detection System, yang meliputi identifikasi lokasi, jumlah dan jenis, pengadaan, penempatan, pemeriksaan, pengujian dan pemeliharaan sesuai dengan peraturan perundingan yang berlaku."},
+    {code:"K3-B.6", text:"Pemeliharaan Fire Protection & Detection System: Unit PLTA telah konsisten melakukan pemeliharaan FP&D System."},
+    {code:"K3-B.7", text:"Prosedur Penerbitan Impairment Permit: Telah tersedia manual/prosedur (SOP/IK) penerbitan impairment permit di Unit PLTA."},
+    {code:"K3-B.8", text:"Monitoring Impairment Permit: Petugas K3 Unit PLTA telah melakukan monitoring impairment permit yang terbit untuk Fire Protection & Detection System yang tidak ready."},
+    {code:"K3-C.1", text:"Hazard Identification, Risk Assessment, and Risk Control (HIRARC): Identifikasi bahaya, penilaian risiko, & pengendalian bahaya di Unit PLTA telah tersedia dan ter-update minimal 1 tahun sekali."},
+    {code:"K3-C.2", text:"Prosedur HIRARC: Prosedur (SOP/IK) sebagai pedoman/panduan penyusunan HIRARC yang masih berlaku tersedia."},
+    {code:"K3-C.3", text:"Penyusunan HIRARC: Penyusun HIRARC PLTA dilakukan oleh petugas/karyawan PLTA yang kompeten (tersertifikasi AK3 Umum)."},
+    {code:"K3-C.4", text:"Total Patrol Aplikasi IZAT (Organik & TAD): Seluruh karyawan Unit PLTA (Organik & TAD) telah konsisten melakukan safety patrol setiap bulan serta meng-upload temuannya (unsafe action, unsafe condition, nearmiss, & positive) melalui aplikasi IZAT (100% karyawan)."},
+    {code:"K3-C.5", text:"Pengukuran HIPERKES: - Telah memiliki prosedur pengukuran HIPERKES internal. - Pengukuran HIPERKES telah dilakukan secara berkala setiap bulan oleh PIC K3 Unit PLTA. - Alat ukur HIPERKES Unit PLTA telah terkalibrasi. - Hasil pengukuran HIPERKES tidak ada yang melebihi NAB. - Telah dilakukan tindak lanjut dari rekomendasi hasil pengukuran HIPERKES tahunan yang dilakukan oleh Pihak Ketiga yang kompeten jika melebihi NAB."},
+    {code:"K3-C.6", text:"Risk Control: Pengendalian risiko ditetapkan serta ter-update dan didokumentasikan dalam aplikasi i-care."},
+    {code:"K3-C.7", text:"Prosedur Safety Induction: Prosedur (SOP/IK) sebagai pedoman/panduan penyampaian safety induction yang masih berlaku tersedia."},
+    {code:"K3-C.8", text:"Safety Induction & Safety Meeting: - Safety induction wajib diberikan kepada pekerja baru, kontraktor, tamu (visitor), magang, dan karyawan yang kembali setelah cuti panjang/pindah area kerja. Ini bertujuan mengenalkan bahaya tempat kerja, prosedur K3, penggunaan APD, dan tata cara darurat untuk mencegah kecelakaan. - Safety Meeting konsisten dijalankan sebelum melaksanakan pekerjaan, khususnya untuk pekerjaan dengan risiko tinggi, project overhaul, nonrutin/modifikasi, maupun pasca insiden."},
+    {code:"K3-C.9", text:"Ketersediaan & Standar Alat Pelindung Diri (APD): Telah tersedia APD sesuai standar di PLTA. APD Umum/Wajib: Safety Helmet, Safety Shoes/Boots, Wearpack, Safety Glasses. APD Khusus Bahaya Listrik (Arc Flash): Sarung Tangan Isolasi Karet, Face Shield (Pelindung Wajah) & Hood (Tudung), Arc-Rated Clothing (Pakaian Tahan Api) APD Khusus Lingkungan Kerja PLTA: Body Harness, Earplug/Earmuff, Gas Detector, Masker/Respirator."},
+    {code:"K3-C.10", text:"Pemeriksaan Kondisi & Kelengkapan Alat Pelindung Diri (APD): Petugas K3 Unit PLTA telah melaksanakan pemeriksaan kondisi dan kelengkapan APD secara rutin untuk APD Wajib dan APD Khusus personel Unit PLTA."},
+    {code:"K3-C.11", text:"Prosedur Penanganan Material Manual & Mekanis: Telah tersedia prosedur (SOP/IK) penanganan material manual & mekanis di Unit PLTA yang meliputi: identifikasi jenis pekerjaan dan material yang ditangani, alat angkat angkut sesuai kapasitas, metode pengangkatan dan pengangkutan yang aman telah dijalankan."},
+    {code:"K3-C.12", text:"Sosialisasi Prosedur Penanganan Material Manual & Mekanis: Telah dilaksanakan sosialisasi prosedur (SOP/IK) penanganan material manual & mekanis kepada seluruh personel di Unit PLTA secara berkala dalam semester berjalan."},
+    {code:"K3-C.13", text:"Rambu Penanganan Material Manual & Mekanis: Telah tersedia rambu terkait penanganan material manual dan mekanis pada lokasi-lokasi yang sering dilakukan kegiatan tersebut di Unit PLTA (Gudang, Bengkel, Assembly Area, Area Turbin & Generator, Intake, Tail Race, dsb)"},
+    {code:"K3-D.1", text:"Uji Periksa dan Izin Peralatan: Peralatan yang wajib disertifikasi atau uji periksa di Unit PLTA: Peralatan angkat angkut, bejana tekan dan tangki timbun, ketel uap, penangkal petir, lift, peralatan pemadam dan peralatan produksi. Pastikan semua peralatan-peralatan tersebut telah dilakukan uji periksa dan izin nya masih berlaku."},
+    {code:"K3-D.2", text:"Jaminan Sosial Tenaga Kerja: Tenaga Alih Daya (TAD), Tenaga Jasa Borong, dan Vendor yang bekerja di area Unit Pembangkit wajib memiliki perlindungan asuransi/jaminan sosial tenaga kerja."},
+    {code:"K3-D.3", text:"Sertifikasi & Kompetensi K3: Telah terdapat personel tersertifikasi Ahli K3 (AK3) Umum maupun AK3 Khusus di Unit PLTA yang bertugas merencanakan dan mengawasi jalannya SMK3, karena Unit PLTA dikategorikan sebagai tempat kerja dengan potensi bahaya tinggi (listrik tegangan tinggi, ruang terbatas, ketinggian, dan potensi tenggelam)."},
+    {code:"K3-E.1", text:"Prosedur, Checklist, & Jadwal Safety Patrol: Telah terdapat dokumen prosedur (SOP/IK) safety patrol dan checklist pengecekan serta jadwal safety patrol K3"},
+    {code:"K3-E.2", text:"Pelaksanaan Safety Patrol: Konsistensi Pimpinan dan Tim K3 Unit PLTA melaksanakan Safety Patrol"},
+    {code:"K3-E.3", text:"Investigasi Insiden: Investigasi insiden telah dilakukan jika terjadi kecelakaan kerja di Unit PLTA."},
+    {code:"K3-E.4", text:"Realisasi Program Kerja Manajemen K3: - Realisasi program kerja manajemen K3 di Unit PLTA sudah sesuai dengan rencana yang ditargetkan oleh Bagian K3 & Keamanan UP Brantas, evidence lengkap & sesuai."},
+    {code:"K3-E.5", text:"Laporan Bulanan Manajemen K3: Laporan bulanan telah konsisten disusun sesuai dengan panduan/format yang ditetapkan, diverifikasi oleh Pimpinan Unit PLTA, dan dikirimkan tepat waktu kepada Bagian K3 UP Brantas."},
+    {code:"K3-F.1", text:"Identifikasi Kondisi Darurat: Unit PLTA sudah melakukan identifikasi kondisi darurat yang dapat terjadi."},
+    {code:"K3-F.2", text:"Sarana Prasarana Tanggap Darurat: - Sudah memiliki peralatan & APD tanggap darurat, serta konsisten dilakukan pemeliharaan. - Jumlah APD mencukupi & life time (masa pakai efektif) APD masih sesuai."},
+    {code:"K3-F.3", text:"Tim Tanggap Darurat: Unit PLTA telah memiliki Tim Tanggap Darurat yang kompeten (sekurang-kurangnya Sertifikat PMK Kelas A/B/C/D & Sertifikat P3K)"},
+    {code:"K3-F.4", text:"Pelatihan Tim Tanggap Darurat: Telah konsiten dilaksanakan pelatihan rutin untuk Tim Tanggap Darurat dalam bentuk KSF/CoP/FGD/Awareness/Sertifikasi minimal 1 x dalam setahun."},
+    {code:"K3-F.5", text:"Prosedur Tanggap Darurat: Prosedur (SOP/IK) tanggap darurat tersedia, ter-update, dan tervalidasi oleh Manajemen."},
+    {code:"K3-F.6", text:"Sosialisasi Prosedur Tanggap Darurat: Prosedur (SOP/IK) tanggap darurat dilakukan sosialisasi minimal 1 kali pertahun dan setiap ada perubahan kepada seluruh workforce, atau pihak terkait yang beraktivitas di tempat kerja."},
+    {code:"K3-F.7", text:"Simulasi Tanggap Darurat: Sudah dilakukan simulasi tanggap darurat (bencana alam/bencana nonalam/lainnya) minimal 1x setahun."},
+    {code:"K3-F.8", text:"Sarana Komunikasi: Sudah terdapat sarana komunikasi utama serta backup yang bisa digunakan saat terjadi kondisi darurat oleh operator."},
+    {code:"K3-F.9", text:"Sarana Kotak P3K: Telah tersedia kotak P3K sesuai standar (warna dasar putih, simbol hijau), isi kotak P3K sesuai daftar, dan tanggal kedaluwarsa dari obat P3K masih sesuai."},
   ]},
-  hiradc: {shortLabel:"HIRADC / Risiko", name:"HIRADC — Identifikasi Bahaya & Penilaian Risiko", items:[
-    {code:"HZ-01", text:"Risiko mekanikal (terjepit, terpotong) pada area turbin/generator telah dinilai dan pengendalian diterapkan."},
-    {code:"HZ-02", text:"Risiko elektrikal (sengatan listrik, arc flash) pada panel/switchgear telah dinilai dan pengendalian diterapkan."},
-    {code:"HZ-03", text:"Risiko bekerja di ketinggian (crane hall, atap powerhouse) memiliki pengendalian sesuai hierarki."},
-    {code:"HZ-04", text:"Risiko ruang terbatas (confined space) pada terowongan/saluran air memiliki izin kerja & prosedur."},
-    {code:"HZ-05", text:"Risiko banjir/kegagalan bendungan memiliki rencana mitigasi dan sistem peringatan dini berfungsi."},
-  ]}
+  "lingk": {shortLabel:"LINGK", name:"MANAJEMEN LINGKUNGAN PLTA", items:[
+    {code:"LINGK-A.1", text:"Kebijakan/Komitmen Manajemen Lingkungan Tersedia: Telah terdapat kebijakan/komitmen manajemen lingkungan sesuai persyaratan yang berlaku, ditandatangani pimpinan Unit Pembangkitan (SM) dan masih berlaku."},
+    {code:"LINGK-A.2", text:"Kebijakan/Komitmen Dikomunikasikan: Kebijakan/komitmen manajemen lingkungan dikomunikasikan kepada seluruh workforce di Unit PLTA agar memahami kebijakan/komitmen yang telah ditetapkan."},
+    {code:"LINGK-B.1", text:"Data B3: Telah dilakukan identifikasi, pencatatan, dan pendataan serta pelaporan pengelolaan B3 di Unit PLTA."},
+    {code:"LINGK-B.2", text:"MSDS & Prosedur B3: - Setiap B3 yang disimpan dan digunakan telah dilengkapi dengan Material Safety Data Sheet (MSDS). - Telah tersedia SOP/IK Penyimpanan B3, update versi terbaru dan masih berlaku."},
+    {code:"LINGK-B.3", text:"Fasilitas & Kelengkapan Gudang B3: - Telah memiliki bangunan serta memenuhi persyaratan teknis bangunan Gudang B3 (Atap kokoh, tidak bocor, & air hujan tidak tampias; Lantai kedap air; Kemiringan lantai maksimal 1% menuju saluran bak penampung; Bak penampung di ujung saluran; Ventilasi harus memadai; Dilengkapi lampu penerangan yang dipasang aman (anti ledakan)). - Fasilitas wajib tersedia di dalam & di sekitar bangunan Gudang B3 (Simbol & Label wajib ditempelkan di setiap kemasan wadah (drum/tangki) serta dinding luar bangunan secara jelas; Tersedia APAR sesuai jenis material & sistem alarm; Tersedia kotak P3K, shower/eyewash, serta spill kit berupa pasir absorben atau serbuk gergaji; Pembatas antar material incompatible dengan jarak minimal 60 cm; Logbook yang mencantumkan tanggal masuk/keluar, jenis, serta volume material B3)."},
+    {code:"LINGK-B.4", text:"Data Pengelolaan Limbah B3 (PLB3): Telah dilakukan identifikasi, pencatatan, dan pendataan serta pelaporan Pengelolaan Limbah B3 (PLB3) di Unit PLTA."},
+    {code:"LINGK-B.5", text:"Neraca & Manifes Pengelolaan Limbah B3 (PLB3): - Telah dibuat Neraca Limbah B3 secara berkala dalam periode pelaporan yang menunjukkan jumlah LB3 yang dikelola dalam TPS LB3 Unit PLTA. - Telah dibuat Dokumen/Manifes Limbah B3 setiap kali ada kegiatan pengangkutan atau pengiriman Limbah B3 ke luar area Unit PLTA."},
+    {code:"LINGK-B.6", text:"Fasilitas & Kelengkapan TPS LB3: - Telah memiliki bangunan serta kelengkapan TPS Limbah B3 (Izin; Papan Nama; Sistem Penerangan; Ventilasi; Saluran & Bak Penampung Ceceran Tumpahan; Terlindung dari Panas & Hujan; Lantai Kedap Air, Tidak Bergelombang, Tidak Retak, Dibuat Melandai ke Arah Bak Penampungan). - Fasilitas wajib tersedia di dalam & di sekitar bangunan TPS B3 (Simbol & Label wajib ditempelkan di setiap kemasan wadah (drum besi/plastik) serta dinding luar bangunan secara jelas; Tersedia APAR sesuai jenis material & sistem alarm; Tersedia kotak P3K, shower/eyewash, serta spill kit berupa pasir absorben atau serbuk gergaji; Pembatas antar limbah yang tidak saling cocok (incompatible) dengan jarak minimal 60 cm; Logbook yang mencantumkan tanggal masuk/keluar, jenis, serta volume limbah B3; SOP/IK Tanggap Darurat LB3)."},
+    {code:"LINGK-B.7", text:"Mitigasi Risiko Pengelolaan Limbah B3 (PLB3): - Tidak terdapat ceceran Limbah B3 di tanah/diluar area yang telah ditentukan. - Telah terdapat simbol & label pada setiap kemasan Limbah B3, penyimpanan menggunakan sistem blok/sel, pengemasan sesuai karakteristik, diberi alas/palet, terkungkung dengan baik, tumpukan maksimal 3 lapis, & penutup kuat. - Penyimpanan tidak melebihi masa simpan (neraca, logbook, SIRAJA telah sesuai penyimpanan dan masa simpan)."},
+    {code:"LINGK-B.8", text:"Tanggap Darurat Pengelolaan Limbah B3 (PLB3): - Telah terdapat SOP/IK Tanggap Darurat dan Pengelolaan Limbah B3 & Dokumen Kedaruratan B3 dan Limbah B3. - Telah dilaksanakan awareness/pelatihan serta uji prosedur/simulasi tanggap darurat penanganan tumpahan Limbah B3 (dilengkapi dengan jadwal & modul pelatihan) minimal 1 tahun sekali. - Telah memiliki personel yang bertanggung jawab dan kompeten (tersertifikasi) di PLB3."},
+    {code:"LINGK-C.1", text:"Perjanjian Kerja Sama (PKS) atau Memorandum of Understanding (MoU): - Unit PLTA memiliki salinan (copy) dokumen PKS atau MoU dengan instansi pemerintah daerah atau perusahaan swasta berizin terkait pengelolaan/pengangkutan limbah cair domestik Unit PLTA. - Terdapat bukti pengeluaran limbah cair domestik Unit PLTA yang dilakukan oleh instansi pemerintah daerah atau perusahaan swasta berizin."},
+    {code:"LINGK-C.2", text:"Fasilitas Pengelolaan Limbah Cair Domestik: Di Unit PLTA terdapat fasilitas pengelolaan limbah cair domestik lainnya."},
+    {code:"LINGK-C.3", text:"Pemisahan Saluran Limbah Cair Domestik: Telah dilakukan pemisahan saluran limbah cair domestik dengan limpasan air hujan."},
+    {code:"LINGK-C.4", text:"Penanggungjawab Pengolahan & Pengendalian: - Memiliki atau dapat menunjukkan salinan (copy) sertifikat kompetensi Penanggungjawab Operasional Pengolahan Air Limbah (POPA). - Memiliki atau dapat menunjukkan salinan (copy) sertifikat kompetensi Penanggungjawab Pengendalian Pencemaran Air (PPPA)."},
+    {code:"LINGK-D.1", text:"Pemantauan Emisi EDG (Genset): - Telah konsisten melakukan pemantauan emisi EDG (Genset) Unit secara periodik sesuai ketentuan peraturan perundang-undangan yang berlaku."},
+    {code:"LINGK-D.2", text:"Pemantauan Emisi EDG (Genset): - Terdapat lubang sampling manual (sampel emisi pada cerobong/stack) yang telah sesuai dengan standar (US EPA Method 1), pada posisi 2D:8D dengan diameter lubang minimal 10 cm. Kecuali untuk Genset dengan diameter < 10 cm, tidak perlu lubang sampling."},
+    {code:"LINGK-D.3", text:"Pemantauan Emisi EDG (Genset): Terdapat tangga akses, platform, 2 sampling port, sumber listrik, katrol, & pagar pengaman."},
+    {code:"LINGK-E.1", text:"Prosedur Pengelolaan Limbah Padat Non B3: - Telah memiliki prosedur pengelolaan limbah padat non B3. - Prosedur tersedia, update (masih berlaku), serta telah dilakukan sosialisasi kepada seluruh karyawan di Unit PLTA."},
+    {code:"LINGK-E.2", text:"TPS Limbah Padat Non B3: Telah memiliki TPS limbah padat non B3 yang terlindung dari hujan, panas matahari, serta masih digunakan."},
+    {code:"LINGK-E.3", text:"Pemilahan Limbah Padat Non B3: Telah dilakukan pemilahan limbah padat non B3 sesuai jenisnya, serta diolah/dibuang pada TPS limbah padat non B3."},
+    {code:"LINGK-E.4", text:"PKS atau MoU Pengeluaran Limbah Padat Non B3: - Memiliki bukti kerjasama pengeluaran limbah padat non B3 yang tidak terolah di Unit PLTA dengan instansi pemerintah daerah atau pihak swasta berizin. - Jika memiliki PKS atau MoU, pengeluaran dilaksanakan secara rutin."},
+    {code:"LINGK-E.5", text:"Inventarisasi Timbulan Limbah Padat Non B3: Telah dilakukan inventarisasi timbulan masing-masing jenis limbah padat non B3 yang dihasilkan, berupa logbook limbah padat non B3."},
+    {code:"LINGK-E.6", text:"Kesesuaian Pengisian Tempat Sampah: Memastikan tempat sampah di area Unit PLTA diisi sesuai kategori sampah yang dihasilkan."},
+    {code:"LINGK-E.7", text:"Implementasi House Keeping (5S): Memastikan program house keeping (5S) berjalan di Unit PLTA."},
+    {code:"LINGK-F.1", text:"Perizinan Lingkungan: - Perizinan lingkungan Unit PLTA dalam status aktif. - Unit PLTA memiliki atau dapat menunjukkan salinan (copy) perizinan lingkungannya."},
+    {code:"LINGK-F.2", text:"Sertifikat ISO 14001-EMS: Memiliki sertifikat ISO 14001:2015 yang terbaru (masih berlaku) serta terpasang pada area publik di Unit PLTA sebagai bentuk awareness & komunikasi kepada stakeholder internal maupun eksternal."},
+    {code:"LINGK-F.3", text:"Realisasi Program Kerja Manajemen Lingkungan: Realisasi program kerja manajemen lingkungan di Unit PLTA sudah sesuai dengan rencana yang ditargetkan oleh Bagian Pembina Kantor UP Brantas, evidence lengkap & sesuai."},
+    {code:"LINGK-F.4", text:"Laporan Pengelolaan Manajemen Lingkungan: Laporan bulanan telah konsisten disusun sesuai dengan panduan/format yang ditetapkan, diverifikasi oleh Pimpinan Unit PLTA, dan dikirimkan tepat waktu kepada Bagian Sipil & Lingkungan UP Brantas."},
+  ]},
+  "kam": {shortLabel:"KAM", name:"MANAJEMEN PENGAMANAN PLTA", items:[
+    {code:"KAM-A.1", text:"Kebijakan SMT & Komitmen Pengamanan Tersedia: Kebijakan SMP baik Kebijakan SMT PLN NP dan Komitmen Pengamanan UP Brantas tersedia dan terpasang di Pos Satuan Pengamanan (Satpam) dan ruangan publik sebagai sarana komunikasi."},
+    {code:"KAM-A.2", text:"Kebijakan Pengamanan Dikomunikasikan: Kebijakan pengamanan telah dikomunikasikan kepada seluruh workforce di Unit PLTA agar memiliki kesadaran & tanggung jawab individu di bidang pengamanan organisasi."},
+    {code:"KAM-A.3", text:"Struktur Organisasi Pengamanan: Struktur organisasi pengamanan UP Brantas tersedia dan terpasang di Pos Satpam sebagai bentuk pendokumentasian & sarana komunikasi."},
+    {code:"KAM-B.1", text:"Patroli Pengamanan (Rencana Pengamanan): Seluruh area tercover oleh patroli pengamanan (rencana pengamanan)"},
+    {code:"KAM-B.2", text:"Monitoring CCTV Keamanan: - Seluruh CCTV keamanan berfungsi dengan baik (tidak ada yang mati/rusak). - Laporan CCTV keamanan dilakukan validasi oleh Asman/TL Unit PLTA."},
+    {code:"KAM-B.3", text:"Jurnal Pos Satpam: Petugas Satpam telah konsisten melakukan pengisian Jurnal Pos Satpam."},
+    {code:"KAM-B.4", text:"Buku Tamu & Kartu Visitor: - Petugas Satpam telah konsisten melakukan pengisian Buku Tamu. - Telah konsisten dalam penerapan Kartu Visitor."},
+    {code:"KAM-B.5", text:"Formulir Pass Barang Keluar/Masuk: Telah konsisten dalam penerapan Formulir Pass untuk barang yang keluar/masuk."},
+    {code:"KAM-B.6", text:"Formulir Izin Bertamu: Telah konsisten dalam pengisian Buku Tamu dan penerapan Formulir Kunjungan Tamu, baik untuk tamu internal maupun eksternal."},
+    {code:"KAM-C.1", text:"Struktur Pengamanan Unit PLTA: Telah ditetapkan struktur pengamanan Unit PLTA beserta tupoksinya."},
+    {code:"KAM-C.2", text:"Daftar Inventaris Pengaman: Inventaris pengamanan telah tercatat dalam buku, serta telah dipastikan kesesuaian antara catatan dengan fisik nya."},
+    {code:"KAM-C.3", text:"Jadwal Shift Satpam: Telah terdapat jadwal shift personel satpam yang berlaku."},
+    {code:"KAM-D.1", text:"Kartu Tanda Anggota & Kompetensi: - Petugas Satpam yang sedang bertugas dapat menunjukkan KTA yang masih berlaku. - Komandan Regu dan anggotanya telah bersertifikat kompetensi yang sesuai dengan tugas & tanggung jawabnya, serta masih berlaku."},
+    {code:"KAM-E.1", text:"Prosedur Pengamanan Tersedia: Seluruh prosedur pengamanan yang ter-update telah tersedia di Pos Satpam."},
+    {code:"KAM-E.2", text:"Kalibrasi & Pemeliharaan Peralatan: Telah dilakukan kalibrasi dan pemeliharaan untuk peralatan pengamanan yang ada di Unit PLTA"},
+    {code:"KAM-E.3", text:"Pengujian Sistem Deteksi & Peringatan Dini Keadaan Darurat: Telah dilakukan pengujian sistem deteksi dan peringatan dini keadaan darurat di Unit PLTA (Buzzer/Alarm/Kentongan/Pagging dsb)."},
+  ]},
+  "gdg": {shortLabel:"GDG", name:"PENGELOLAAN PERGUDANGAN PLTA", items:[
+    {code:"GDG-A.1", text:"Stock Count (Opname Harian): Melakukan stock count (opname harian) terhadap barang/material yang ada pergerakannya."},
+    {code:"GDG-A.2", text:"Formulir (Checklist) Stock Count: Mengisi Formulir (checklist) Stock Count sesuai prosedur tata laksana pergudangan."},
+    {code:"GDG-A.3", text:"Kesesuaian Jumlah Barang/Material: Item dan jumlah barang/material yang ada dalam gudang sama dengan yang di SIT/Ellipse."},
+    {code:"GDG-B.1", text:"Rencana Kedatangan Barang/Material: Monitoring dan Scheduling Rencana Kedatangan Barang/Material"},
+    {code:"GDG-B.2", text:"Kualitas Barang/Material: Melakukan pemeriksaan dan pengecekan kualitas barang/material, kelengkapan dokumen yang dibutuhkan."},
+    {code:"GDG-B.3", text:"Jurnal Masuk/Keluar Barang/Material: Setiap pemasukan barang/material dilakukan pencatatan pada buku jurnal masuk/keluar barang."},
+    {code:"GDG-B.4", text:"Kartu Gantung: Melakukan pencatatan penerimaan barang/material pada kartu gantung dan merangkum untuk dibuat pada laporan pergerakan barang/material setiap bulan."},
+    {code:"GDG-C.1", text:"Penomoran Gudang: Setiap gudang diberi nomor secara berurutan."},
+    {code:"GDG-C.2", text:"Penomoran Rak: Rak-rak barang/material, petak-petak pada tiap-tiap rak, lantai rak dan deretan rak diberi nomor dengan huruf atau angka-angka."},
+    {code:"GDG-C.3", text:"Bin Location: Penempatan barang/material ke dalam rak barang/material sesuai dengan bin location yang telah ditentukan."},
+    {code:"GDG-C.4", text:"Material B3: Barang/material yang mengandung racun atau bahan kimia berbahaya, mudah terbakar ditempatkan dalam gudang B3 (jika ada)."},
+    {code:"GDG-C.5", text:"Fire Protection System: Terdapat peralatan pemadam kebakaran CO² atau powder dan busa."},
+    {code:"GDG-D.1", text:"Buku Jurnal Masuk/Keluar Barang: Setiap pengeluaran barang/material dilakukan pencatatan pada buku jurnal masuk/keluar barang."},
+    {code:"GDG-D.2", text:"Issued Requisition: Transaksi pengeluaran barang/material dari gudang melalui (SIT) Ellipse (dibuatkan Issued Requisition)."},
+    {code:"GDG-D.3", text:"Kartu Gantung: Melakukan pencatatan pengeluaran barang/material pada kartu gantung dan merangkum untuk dibuat pada laporan pergerakan barang/material setiap bulan."},
+    {code:"GDG-E.1", text:"Pencatatan Material Bekas Pakai: Barang/material bekas pakai (kecuali material consumable) disimpan dan dicatat secara tertib dan baik di gudang"},
+    {code:"GDG-E.2", text:"Identifikasi & Klasifikasi Material Bekas Pakai: Dilakukan identifikasi dan klasifikasi."},
+    {code:"GDG-E.3", text:"Mutasi Material Bekas Pakai: Dilakukan pencatatan pergerakannya (mutasi) secara tertib dan baik terhadap pengeluaran barang/material yang akan dilakukan repair."},
+    {code:"GDG-F.1", text:"Pencatatan Material Mandatory: Barang/material mandatory disimpan dan dicatat secara tertib dan baik di gudang."},
+    {code:"GDG-F.2", text:"Mutasi Material Mandatory: Dilakukan pencatatan pergerakannya (mutasi) secara tertib dan baik terhadap pengeluaran barang/material mandatory yang digunakan."},
+    {code:"GDG-G.1", text:"Kebersihan Material: Kebersihan Material (Spare part, umum/consumable, mandatory, return)"},
+    {code:"GDG-G.2", text:"Kebersihan Area Gudang: Kebersihan Area Gudang (Rak/almari Penyimpanan, lantai penyimpanan, atap gudang, export area, import area)"},
+    {code:"GDG-G.3", text:"Kebersihan Bangunan & Fasilitas Gudang: Kebersihan Bangunan dan Fasilitas Gudang (bangunan, papan informasi gudang, komputer, peralatan gudang, kamar mandi)"},
+  ]},
+  "sm-umum-sdm": {shortLabel:"SM-UMUM-SDM", name:"SISTEM MANAJEMEN, UMUM, & SDM PLTA", items:[
+    {code:"SM-UMUM-SDM-A.1", text:"The International Organization for Standardization: Certificate of Registration Standard System Management (PAS 99, ISO 9001, ISO 14001, ISO 45001, ISO 55001, ISO 50001, dan ISO lainnya) tersedia dan terpasang di ruangan publik sebagai sarana komunikasi serta ter-update (tidak ada yang kedaluwarsa/expired)."},
+    {code:"SM-UMUM-SDM-A.2", text:"Kebijakan Sistem Manajemen Terintegrasi: SK Kebijakan Sistem Manajemen tersedia dan terpasang di ruangan publik sebagai sarana komunikasi serta ter-update (masih berlaku)."},
+    {code:"SM-UMUM-SDM-A.3", text:"Identitas Korporat PT PLN Nusantara Power: Seluruh dokumen, papan informasi, dan banner informasi telah menggunakan logo PT PLN Nusantara Power."},
+    {code:"SM-UMUM-SDM-A.4", text:"ISO 22301:2019 Business Continuity Management System: 1. Di Ruang CCR telah terdapat daftar nomor telepon penting stakeholder internal dan eksternal PLTA yang ter-update. 2. Sudah terdapat perencanaan dan eksekusi pemeliharaan untuk sarana komunikasi di PLTA."},
+    {code:"SM-UMUM-SDM-A.5", text:"ISO 55001:2014 Asset Management System: Kesesuaian pengelolaan manajemen aset di PLTA"},
+    {code:"SM-UMUM-SDM-B.1", text:"Extra Comptable: Update Kartu Inventarisasi Peralatan Kantor/Fasilitas Pendukung (Extra Comptable) dilakukan setiap tahun."},
+    {code:"SM-UMUM-SDM-B.2", text:"Konkin SDM: Jumlah pelaksanaan KSF/CoP PLTA minimal 1 x per semester"},
+    {code:"SM-UMUM-SDM-B.3", text:"Konkin SDM: Penyampaian Ide Inovasi melalui Bravement (atau yang serupa) minimal 50% dari jumlah karyawan organik PLTA"},
+  ]},
+  "keu": {shortLabel:"KEU", name:"PENGELOLAAN KEUANGAN PLTA", items:[
+    {code:"KEU-A.1", text:"Kesesuaian kuitansi dan nota: => Penguatan pengendalian dokumen dan keterbacaan bukti transaksi dalam jangka panjang."},
+    {code:"KEU-A.2", text:"Kesesuaian kuitansi dan nota: => Ketidaksesuaian tanggal antara bukti pembayaran dan formulir verifikasi"},
+    {code:"KEU-A.3", text:"Kesesuaian kuitansi dan nota: => Bukti transaksi tidak memenuhi persyaratan kelengkapan dokumen sesuai ketentuan yang berlaku."},
+    {code:"KEU-A.4", text:"Kesesuaian kuitansi dan nota: => Pengendalian perubahan dokumen dan keandalan bukti transaksi."},
+    {code:"KEU-A.5", text:"Kesesuaian kuitansi dan nota: => Keabsahan dan kelengkapan bukti transaksi"},
+    {code:"KEU-B.1", text:"Kelengkapan dokumen pembayaran (tanda tangan, foto, berkas): => Otorisasi, akuntabilitas, dan pengendalian dokumen."},
+    {code:"KEU-B.2", text:"Kelengkapan dokumen pembayaran (tanda tangan, foto, berkas): => Ketidaksesuaian penerimaan barang/material."},
+    {code:"KEU-B.3", text:"Kelengkapan dokumen pembayaran (tanda tangan, foto, berkas): => Dokumen pendukung yang tidak relevan dengan transaksi yang dipertanggungjawabkan. 1. Klarifikasi dan investigasi lebih lanjut. 2. Red flag fraud (indikasi kecurangan)."},
+    {code:"KEU-B.4", text:"Kelengkapan dokumen pembayaran (tanda tangan, foto, berkas): => Kelengkapan dokumen, penguatan proses verifikasi, dan kepatuhan terhadap prosedur pertanggungjawaban keuangan"},
+    {code:"KEU-C.1", text:"Pembebanan Pajak dan/atau meterai pembelian/belanja/pekerjaan/jasa: => Kurangnya pemahaman terhadap ketentuan perpajakan yang berlaku."},
+    {code:"KEU-C.2", text:"Pembebanan Pajak dan/atau meterai pembelian/belanja/pekerjaan/jasa: => Dokumen yang terutang Bea Meterai"},
+    {code:"KEU-C.3", text:"Pembebanan Pajak dan/atau meterai pembelian/belanja/pekerjaan/jasa: => Ketidaklengkapan dokumen pendukung transaksi & Ketidakpatuhan terhadap ketentuan administrasi perpajakan."},
+    {code:"KEU-D.1", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Ketidakpatuhan terhadap prosedur pengadaan yang berlaku."},
+    {code:"KEU-D.2", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Ketidaksesuaian penggunaan nomor WO (Work Order) atau PRK (Program Rencana Kerja)"},
+    {code:"KEU-D.3", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Aspek awareness, kepatuhan administrasi, dan pengendalian biaya fiskal."},
+    {code:"KEU-D.4", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Ketidakakuratan pembebanan biaya pada kegiatan atau pekerjaan yang telah dilaksanakan."},
+    {code:"KEU-D.5", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Penggunaan anggaran tidak sesuai dengan rencana yang telah ditetapkan."},
+    {code:"KEU-D.6", text:"Kesesuaian cost center/ pembebanan/ pos anggaran dengan jenis pekerjaan/ jasa/ belanja: => Terdapat indikasi ketidakwajaran frekuensi pengisian freon AC."},
+  ]},
 };
 
 /* ---------- Master data (mutable, persisted in IndexedDB) ---------- */
@@ -2950,6 +3152,39 @@ async function addStandard(){
   renderStandardsManage();
   renderStandardChips();
   toast('Standar ditambahkan. Lengkapi poin checklistnya di bawah.');
+}
+
+async function importStandardsFromJson(mode){
+  const ta=document.getElementById('std-import-json');
+  const raw=ta.value.trim();
+  if(!raw){ toast('Tempel data JSON terlebih dahulu'); return; }
+  let parsed;
+  try{ parsed=JSON.parse(raw); }
+  catch(e){ toast('JSON tidak valid: '+e.message); return; }
+  if(typeof parsed!=='object' || Array.isArray(parsed) || !parsed){ toast('Format harus berupa objek {kode_standar: {...}, ...}'); return; }
+  const keys=Object.keys(parsed);
+  for(const k of keys){
+    const s=parsed[k];
+    if(!s || typeof s.shortLabel!=='string' || typeof s.name!=='string' || !Array.isArray(s.items)){
+      toast('Standar "'+k+'" formatnya tidak lengkap (butuh shortLabel, name, items[])'); return;
+    }
+  }
+  const totalItems=keys.reduce((sum,k)=>sum+parsed[k].items.length,0);
+  const msg = mode==='replace'
+    ? ('Ini akan MENGHAPUS seluruh standar yang ada sekarang dan menggantinya dengan '+keys.length+' standar baru ('+totalItems+' poin checklist total). Lanjutkan?')
+    : ('Ini akan menambahkan/menimpa '+keys.length+' standar ('+totalItems+' poin checklist), standar lain yang tidak disebut tetap ada. Lanjutkan?');
+  if(!confirm(msg)) return;
+
+  if(mode==='replace'){
+    MASTER.standards = parsed;
+  } else {
+    MASTER.standards = Object.assign({}, MASTER.standards, parsed);
+  }
+  await saveMaster();
+  ta.value='';
+  renderStandardsManage();
+  renderStandardChips();
+  toast('Berhasil: '+keys.length+' standar diterapkan ('+totalItems+' poin checklist).');
 }
 async function updateStdMeta(key, field, value){
   value=value.trim();
