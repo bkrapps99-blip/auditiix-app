@@ -100,6 +100,7 @@ body{
 /* ---- Locked nav (closing/report while session closed) ---- */
 .navbtn.locked{opacity:0.32;pointer-events:none;}
 .navbtn.role-hidden{display:none!important;}
+.navbtn.nav-disabled{opacity:0.35;pointer-events:none;}
 ::selection{background:var(--amber);color:#12171B;}
 button{font-family:inherit;}
 input,textarea,select{font-family:inherit;}
@@ -1880,6 +1881,7 @@ function applyRolePermissions(){
     const nav=btn.dataset.nav;
     const allowed = (NAV_ROLES[nav]||[]).includes(currentUser.role);
     btn.classList.toggle('role-hidden', !allowed);
+    btn.classList.remove('nav-disabled');
   });
   if(currentUser.role==='auditor'){
     document.getElementById('inp-auditor').value = currentUser.fullName;
@@ -2153,15 +2155,15 @@ function isSessionOwnedByMe(){
   if(currentUser.role==='auditee') return state.auditeeUsername===currentUser.username;
   return true;
 }
-// Sembunyikan menu Checklist & Closing kalau evaluator yang login bukan pemilik sesi ini —
+// Nonaktifkan (bukan sembunyikan) menu Checklist & Closing kalau evaluator yang login bukan pemilik sesi ini —
 // mencegah evaluator lain mengedit checklist/closing milik evaluator lain (Laporan tetap bisa diakses).
 function updateSessionOwnershipUI(){
   if(!currentUser || currentUser.role!=='auditor') return;
   const owned=isSessionOwnedByMe();
   const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
   const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
-  if(checklistBtn) checklistBtn.classList.toggle('role-hidden', !owned);
-  if(closingBtn) closingBtn.classList.toggle('role-hidden', !owned);
+  if(checklistBtn) checklistBtn.classList.toggle('nav-disabled', !owned);
+  if(closingBtn) closingBtn.classList.toggle('nav-disabled', !owned);
 }
 async function loadSession(id){
   const all=await dbGetAll();
