@@ -2224,7 +2224,7 @@ async function callAI(prompt){
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 300 }
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } }
       })
     });
     if(!response.ok){
