@@ -2224,7 +2224,7 @@ async function callAI(prompt){
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } }
+        generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } }
       })
     });
     if(!response.ok){
@@ -2286,36 +2286,49 @@ async function callAI(prompt){
 // Menyusun teks final "Agar .... Eviden: ..." dari jawaban AI, supaya formatnya SELALU konsisten
 // walau AI tidak selalu patuh 100% pada instruksi JSON (model AI kadang tetap menyelipkan
 // teks tambahan atau lupa strukturnya) — aplikasi yang merapikan, bukan mengandalkan AI.
-function formatRekomendasiAgarEviden(raw){
-  let tindakan='', eviden='', parsed=null;
-  try{
-    const cleaned=String(raw).replace(/```json|```/gi,'').trim();
-    const match=cleaned.match(/\{[\s\S]*\}/);
-    parsed=JSON.parse(match? match[0] : cleaned);
-  }catch(e){ parsed=null; }
-
-  if(parsed && typeof parsed.tindakan==='string'){
-    tindakan=parsed.tindakan.trim();
-    eviden=(parsed.eviden||'').trim();
-  } else {
-    tindakan=String(raw).replace(/```json|```/gi,'').trim();
-    const evIdx=tindakan.search(/eviden\s*:/i);
-    if(evIdx>=0){
-      eviden=tindakan.slice(evIdx).replace(/^eviden\s*:\s*/i,'').trim();
-      tindakan=tindakan.slice(0,evIdx).trim();
-    }
-  }
-
+// Menyusun teks final "Agar .... Eviden: ..." (atau daftar bernomor "1. Agar ... 2. Agar ...")
+// dari jawaban AI, supaya formatnya SELALU konsisten walau AI tidak selalu patuh 100% pada
+// instruksi JSON — aplikasi yang merapikan, bukan mengandalkan AI.
+function formatSatuRekomendasi(item){
+  let tindakan=(item && typeof item.tindakan==='string') ? item.tindakan.trim() : '';
+  let eviden=(item && typeof item.eviden==='string') ? item.eviden.trim() : '';
   tindakan=tindakan.replace(/^agar\s+/i,'').trim();
   if(tindakan) tindakan=tindakan.charAt(0).toLowerCase()+tindakan.slice(1);
   const endWithDot=(s)=> (s && !/[.!?]$/.test(s)) ? s+'.' : s;
   tindakan=endWithDot(tindakan);
   eviden=eviden.replace(/^eviden\s*:\s*/i,'').trim();
   eviden=endWithDot(eviden);
-
   let result='Agar '+tindakan;
   if(eviden) result+=' Eviden: '+eviden;
   return result.trim();
+}
+function formatRekomendasiAgarEviden(raw){
+  let parsed=null;
+  try{
+    const cleaned=String(raw).replace(/```json|```/gi,'').trim();
+    const match=cleaned.match(/\[[\s\S]*\]|\{[\s\S]*\}/); // array [...] diprioritaskan, objek {...} sbg cadangan
+    parsed=JSON.parse(match? match[0] : cleaned);
+  }catch(e){ parsed=null; }
+
+  let items=null;
+  if(Array.isArray(parsed)) items=parsed;
+  else if(parsed && typeof parsed==='object') items=[parsed];
+
+  if(items && items.length){
+    const formatted=items.map(formatSatuRekomendasi).filter(Boolean);
+    if(formatted.length===1) return formatted[0];
+    return formatted.map((t,i)=>`${i+1}. ${t}`).join('\n');
+  }
+
+  // AI tidak balas JSON sama sekali — pakai teks apa adanya, tetap coba pisahkan "Eviden:" kalau ada.
+  let tindakan=String(raw).replace(/```json|```/gi,'').trim();
+  let eviden='';
+  const evIdx=tindakan.search(/eviden\s*:/i);
+  if(evIdx>=0){
+    eviden=tindakan.slice(evIdx);
+    tindakan=tindakan.slice(0,evIdx).trim();
+  }
+  return formatSatuRekomendasi({tindakan, eviden});
 }
 async function generateRecommendation(isRefresh){
   const it=state.items[activeItemIndex];
@@ -2327,16 +2340,18 @@ async function generateRecommendation(isRefresh){
   const originalBtnHtml=btn.innerHTML;
   btn.innerHTML='<span>Menganalisis…</span>'; btn.disabled=true; refreshLink.style.opacity=0.5; refreshLink.style.pointerEvents='none';
   try{
-    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan SATU rekomendasi tindakan korektif dalam Bahasa Indonesia yang detail, spesifik, dan tidak menimbulkan salah paham bagi Pemilik Proses yang akan menindaklanjuti.
+    let prompt = `Anda adalah asisten evaluator K3/Mutu/Lingkungan pada pembangkit listrik tenaga air (PLTA) di Indonesia. Berdasarkan klausul checklist dan catatan evaluasi evaluator berikut, buatkan rekomendasi tindakan korektif dalam Bahasa Indonesia yang detail, spesifik, dan tidak menimbulkan salah paham bagi Pemilik Proses yang akan menindaklanjuti.
 
-Balas HANYA dengan JSON valid (tanpa markdown code fence, tanpa teks lain di luar JSON), persis struktur berikut:
-{"tindakan": "kalimat perintah tindakan yang spesifik dan actionable, sebutkan objek/lokasi persis dari klausul/catatan (jangan mengarang lokasi baru), TANPA kata 'Agar' di awal karena akan ditambahkan otomatis", "eviden": "bukti konkret yang harus dilampirkan Pemilik Proses untuk menutup temuan ini, mis. foto/dokumen/sertifikat/hasil uji sesuai konteks klausul"}
+PENTING: Kalau "Catatan evaluasi evaluator" berisi BEBERAPA poin terpisah (mis. bernomor "1. ... 2. ..." atau berbentuk daftar/baris terpisah), buatkan SATU rekomendasi untuk MASING-MASING poin secara terpisah, sesuai urutan poinnya. Kalau catatan cuma berisi satu masalah/satu kalimat, cukup buat satu rekomendasi saja.
+
+Balas HANYA dengan JSON ARRAY valid (tanpa markdown code fence, tanpa teks lain di luar JSON) — SATU elemen array per poin catatan, persis struktur berikut:
+[{"tindakan": "kalimat perintah tindakan yang spesifik dan actionable untuk poin ini, sebutkan objek/lokasi persis dari klausul/catatan (jangan mengarang lokasi baru), TANPA kata 'Agar' di awal karena akan ditambahkan otomatis", "eviden": "bukti konkret yang harus dilampirkan Pemilik Proses untuk menutup poin temuan ini, mis. foto/dokumen/sertifikat/hasil uji sesuai konteks"}]
 
 Klausul: ${it.code} — ${it.text}
 Tingkat evaluasi: ${ratingLabel}
 Catatan evaluasi evaluator: ${noteNow || '(tidak ada catatan tambahan)'}`;
     if(isRefresh && ta.value.trim()){
-      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap balas dalam format JSON {"tindakan":"...","eviden":"..."} di atas.`;
+      prompt += `\n\nRekomendasi sebelumnya: "${ta.value.trim()}"\nBerikan rekomendasi ALTERNATIF yang berbeda dari sebelumnya, tetap balas dalam format JSON ARRAY [{"tindakan":"...","eviden":"..."}] di atas.`;
     }
     const raw = await callAI(prompt);
     if(!raw) throw new Error('empty response');
