@@ -2087,7 +2087,7 @@ async function refreshSavedSessions(){
   }).join('');
 }
 async function deleteSession(id){
-  askConfirm('Hapus sesi ini beserta seluruh foto, catatan, dan tanda tangan di dalamnya? Tindakan ini tidak dapat dibatalkan.', async ()=>{
+  askConfirm('Hapus PERMANEN sesi ini beserta seluruh foto, catatan, dan tanda tangan di dalamnya — termasuk dari server. Data TIDAK BISA dipulihkan lagi setelah ini. Lanjutkan?', async ()=>{
     await dbDelete(id);
     if(state.id===id){
       state={id:null, nomor:null, unit:'', standard:'', auditor:'', auditorUsername:'', createdAt:null, items:[], auditeeUsername:'', auditeeName:'', sigAuditor:null, sigAuditee:null, closed:false, approvalStatus:'draft', sentForApprovalAt:null, approvedAt:null, followUpReport:null, closingLog:[]};
