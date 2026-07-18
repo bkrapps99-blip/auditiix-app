@@ -2090,10 +2090,16 @@ async function refreshSavedSessions(){
   }
   const term=(homeSessionSearchTerm||'').trim().toLowerCase();
   if(term){
+    const tokens = term.split(/\s+/).filter(Boolean);
     all = all.filter(s=>{
-      const stdLabel = MASTER.standards[s.standard]?.shortLabel || s.standard || '';
-      return [s.nomor, s.unit, s.auditor, s.auditeeName, stdLabel, s.standard]
-        .some(v=>String(v||'').toLowerCase().includes(term));
+      const stdLabel = MASTER.standards[s.standard]?.shortLabel || '';
+      const stdName = MASTER.standards[s.standard]?.name || '';
+      const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'full'}) : '';
+      const haystacks = [s.nomor, s.unit, s.auditor, s.auditeeName, stdLabel, stdName, s.standard, dateStr]
+        .map(v=>String(v||'').toLowerCase());
+      // Setiap kata kunci (dipisah spasi) harus cocok di SALAH SATU kolom (boleh beda kolom per kata),
+      // mis. "bakri k3 juli" -> "bakri" cocok di nama evaluator, "k3" di standar, "juli" di tanggal.
+      return tokens.every(tok => haystacks.some(h=>h.includes(tok)));
     });
   }
   if(!all.length){ box.innerHTML=`<div class="empty"><p>${term? 'Tidak ada sesi yang cocok dengan pencarian.' : 'Belum ada sesi tersimpan.'}</p></div>`; return; }
