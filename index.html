@@ -1106,9 +1106,18 @@ async function pushStandardsNow(){
 // Coba dapatkan nomor sesi resmi dari server (agar tidak bentrok antar perangkat saat online).
 // Jika gagal/offline, kembalikan null supaya caller memakai counter lokal seperti biasa.
 async function tryServerSessionNumber(){
-  if(!syncConfigured() || !MASTER.accessToken || !navigator.onLine) return null;
+  if(!syncConfigured() || !navigator.onLine) return null;
+  if(!MASTER.accessToken){
+    let reconnected=false;
+    if(currentUser){
+      const hist=(MASTER.loginHistory||[]).find(h=>h.username===currentUser.username);
+      if(hist) reconnected = await apiLogin(hist.username, hist.password);
+    }
+    if(!reconnected){ updateNetStatus(); return null; }
+  }
   try{
     const res = await apiRequest('/session-number/next', {method:'POST'});
+    updateNetStatus();
     if(!res.ok) return null;
     const data = await res.json();
     return data.nomor || null;
