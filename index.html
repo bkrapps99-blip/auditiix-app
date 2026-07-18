@@ -470,7 +470,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div class="divider"></div>
     </div>
     <div class="eyebrow" id="saved-sessions-heading">Sesi Tersimpan</div>
-    <input class="input" id="home-session-search" oninput="onHomeSessionSearch(this.value)" placeholder="Cari No. Evaluasi Kepatuhan, objek evaluasi kepatuhan, evaluator, standar, dsb..." style="margin-bottom:12px;">
+    <input class="input" id="home-session-search" oninput="onHomeSessionSearch(this.value)" placeholder="Cari No. Evaluasi, objek evaluasi, evaluator, standar, bulan, status (selesai/berjalan/dsb)..." style="margin-bottom:12px;">
     <div id="saved-sessions"></div>
   </div>
 
@@ -2095,10 +2095,11 @@ async function refreshSavedSessions(){
       const stdLabel = MASTER.standards[s.standard]?.shortLabel || '';
       const stdName = MASTER.standards[s.standard]?.name || '';
       const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'full'}) : '';
-      const haystacks = [s.nomor, s.unit, s.auditor, s.auditeeName, stdLabel, stdName, s.standard, dateStr]
+      const statusLabel = APPROVAL_STATUS_MAP[s.approvalStatus||'draft']?.label || '';
+      const haystacks = [s.nomor, s.unit, s.auditor, s.auditeeName, stdLabel, stdName, s.standard, dateStr, statusLabel]
         .map(v=>String(v||'').toLowerCase());
       // Setiap kata kunci (dipisah spasi) harus cocok di SALAH SATU kolom (boleh beda kolom per kata),
-      // mis. "bakri k3 juli" -> "bakri" cocok di nama evaluator, "k3" di standar, "juli" di tanggal.
+      // mis. "bakri k3 juli selesai" -> "bakri" cocok evaluator, "k3" standar, "juli" tanggal, "selesai" status.
       return tokens.every(tok => haystacks.some(h=>h.includes(tok)));
     });
   }
