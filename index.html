@@ -540,7 +540,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
     </div>
 
     <div class="field">
-      <input class="input" id="rekap-search" oninput="onRekapSearch(this.value)" placeholder="Cari No. Evaluasi Kepatuhan, objek evaluasi kepatuhan, evaluator, dsb...">
+      <input class="input" id="rekap-search" oninput="onRekapSearch(this.value)" placeholder="Cari No. Evaluasi, objek evaluasi, evaluator, standar, bulan, status (selesai/berjalan/dsb)...">
     </div>
     <div class="btn-row" style="margin-bottom:16px;">
       <button class="btn btn-primary" onclick="exportRekapPdf()">Ekspor PDF</button>
@@ -564,7 +564,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
     <p class="page-sub">Rekapitulasi seluruh evaluasi dari semua sesi evaluasi kepatuhan.</p>
 
     <div class="field">
-      <input class="input" id="findings-search" oninput="onFindingsSearch(this.value)" placeholder="Cari No. Evaluasi Kepatuhan, objek evaluasi kepatuhan, evaluasi, PIC, dsb...">
+      <input class="input" id="findings-search" oninput="onFindingsSearch(this.value)" placeholder="Cari No. Evaluasi, objek evaluasi, evaluasi, PIC, bulan, status (selesai/berjalan/open/close/dsb)...">
     </div>
     <div class="btn-row" style="margin-bottom:14px;">
       <button class="btn btn-primary" onclick="exportFindingsPdf()">Ekspor PDF</button>
@@ -3793,10 +3793,12 @@ async function getRekapRows(){
       nomor: s.nomor||'-',
       tanggal: s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'medium'}) : '-',
       tanggalRaw: s.createdAt||'',
+      tanggalSearch: s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'full'}) : '',
       unit: s.unit||'-',
       standar: MASTER.standards[s.standard]?.shortLabel || s.standard || '-',
       auditor: s.auditor||'-',
       auditee: auditeeDisplayName(s),
+      status: APPROVAL_STATUS_MAP[s.approvalStatus||'draft']?.label || '',
       open: openCount,
       close: closeCount
     };
@@ -3833,8 +3835,12 @@ async function renderRekap(){
   document.getElementById('rekap-total').textContent=rows.length;
   document.getElementById('rekap-open').textContent=rows.reduce((sum,r)=>sum+r.open,0);
   document.getElementById('rekap-close').textContent=rows.reduce((sum,r)=>sum+r.close,0);
-  const term=(rekapSearchTerm||'').toLowerCase();
-  let filtered = term? rows.filter(r=>[r.nomor,r.tanggal,r.unit,r.standar,r.auditor,r.auditee].some(v=>String(v).toLowerCase().includes(term))) : rows;
+  const term=(rekapSearchTerm||'').trim().toLowerCase();
+  const tokens = term.split(/\s+/).filter(Boolean);
+  let filtered = tokens.length? rows.filter(r=>{
+    const haystacks=[r.nomor,r.tanggal,r.tanggalSearch,r.unit,r.standar,r.auditor,r.auditee,r.status].map(v=>String(v||'').toLowerCase());
+    return tokens.every(tok=>haystacks.some(h=>h.includes(tok)));
+  }) : rows;
   filtered = sortRows(filtered, rekapSort);
   _rekapFilteredRows=filtered;
   renderRekapHead();
@@ -3920,6 +3926,8 @@ async function getAdminFindingsRows(){
         unit: s.unit||'-',
         tanggal: s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'medium'}) : '-',
         tanggalRaw: s.createdAt||'',
+        tanggalSearch: s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'full'}) : '',
+        sesiStatus: APPROVAL_STATUS_MAP[s.approvalStatus||'draft']?.label || '',
         temuan: `${f.code}: ${(f.note && f.note.trim()) ? f.note.trim() : '(tidak ada catatan)'}`,
         rekomendasi: f.recommendation||'-',
         pic: picJabatan,
@@ -3946,8 +3954,12 @@ function setAdminFindingsSort(key){
 function onFindingsSearch(val){ adminFindingsSearch=val; renderAdminFindings(); }
 async function renderAdminFindings(){
   const rows=await getAdminFindingsRows();
-  const term=(adminFindingsSearch||'').toLowerCase();
-  let filtered = term? rows.filter(r=>[r.nomor,r.unit,r.tanggal,r.temuan,r.rekomendasi,r.pic,r.tlLine1,r.tlLine2,r.status].some(v=>String(v).toLowerCase().includes(term))) : rows;
+  const term=(adminFindingsSearch||'').trim().toLowerCase();
+  const tokens = term.split(/\s+/).filter(Boolean);
+  let filtered = tokens.length? rows.filter(r=>{
+    const haystacks=[r.nomor,r.unit,r.tanggal,r.tanggalSearch,r.temuan,r.rekomendasi,r.pic,r.tlLine1,r.tlLine2,r.status,r.sesiStatus].map(v=>String(v||'').toLowerCase());
+    return tokens.every(tok=>haystacks.some(h=>h.includes(tok)));
+  }) : rows;
   filtered = sortRows(filtered, adminFindingsSort);
   _adminFindingsFiltered=filtered;
   renderAdminFindingsHead();
