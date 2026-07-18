@@ -742,7 +742,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div id="fu-item-text" style="font-size:13.5px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;"></div>
       <div class="hidden" id="fu-finding-note-box" style="margin-bottom:16px;">
         <label style="display:block;font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);letter-spacing:0.3px;margin-bottom:6px;">CATATAN EVALUASI</label>
-        <div id="fu-finding-note-text" style="font-size:13.5px;line-height:1.5;"></div>
+        <div id="fu-finding-note-text" style="font-size:13.5px;line-height:1.5;white-space:pre-line;"></div>
       </div>
       <div class="rec-box hidden" id="fu-recommendation-box" style="margin-top:0;margin-bottom:16px;"></div>
 
@@ -2481,7 +2481,7 @@ function openFollowUp(idx){
   else { findingNoteBox.classList.add('hidden'); }
 
   const recBox=document.getElementById('fu-recommendation-box');
-  if(it.recommendation){ recBox.classList.remove('hidden'); recBox.innerHTML='<b>Rekomendasi Evaluator</b>'+escapeHtml(it.recommendation); }
+  if(it.recommendation){ recBox.classList.remove('hidden'); recBox.style.whiteSpace='pre-line'; recBox.innerHTML='<b>Rekomendasi Evaluator</b>'+nl2br(it.recommendation); }
   else { recBox.classList.add('hidden'); }
 
   const noteEl=document.getElementById('fu-note');
@@ -2617,9 +2617,9 @@ function renderFindings(){
         </div>
       </div>
       <div style="font-size:13.5px;margin:6px 0;line-height:1.5;">${f.text}</div>
-      ${f.note?`<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:6px;">📝 ${f.note}</div>`:''}
+      ${f.note?`<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:6px;white-space:pre-line;">📝 ${nl2br(f.note)}</div>`:''}
       ${f.photos.length?`<div class="thumb-row">${f.photos.map(p=>`<div class="thumb"><img src="${p}"></div>`).join('')}</div>`:''}
-      ${f.recommendation?`<div class="rec-box"><b>Rekomendasi</b>${f.recommendation}</div>`:''}
+      ${f.recommendation?`<div class="rec-box" style="white-space:pre-line;"><b>Rekomendasi</b>${nl2br(f.recommendation)}</div>`:''}
       ${latestHistoryLine(f.followUp)}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
         <button class="icon-btn btn-sm" onclick="openFollowUp(${f._idx})">${preAgreement?'Tanggapan Pemilik Proses':'Tindak Lanjut'}</button>
@@ -2719,8 +2719,8 @@ function renderClosingSummaryCard(){
             ${f.rating!=='ofi'? `<span class="sev-tag ${status==='CLOSE'?'ok':'major'}">${status}</span>` : ''}
           </div>
         </div>
-        <div style="margin-bottom:4px;"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">EVALUASI</span><br>${escapeHtml(f.note||f.text)}</div>
-        <div style="margin-bottom:4px;color:var(--teal);"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">REKOMENDASI</span><br>${escapeHtml(f.recommendation||'-')}</div>
+        <div style="margin-bottom:4px;white-space:pre-line;"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">EVALUASI</span><br>${nl2br(f.note||f.text)}</div>
+        <div style="margin-bottom:4px;color:var(--teal);white-space:pre-line;"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">REKOMENDASI</span><br>${nl2br(f.recommendation||'-')}</div>
         <div style="margin-bottom:4px;color:var(--text-dim);"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">TANGGAPAN PEMILIK PROSES</span><br>${escapeHtml(latestAuditee)}</div>
         <div style="color:var(--text-dim);"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:9.5px;">TANGGAPAN EVALUATOR</span><br>${escapeHtml(latestAuditor)}</div>
       </div>`;
@@ -2963,8 +2963,8 @@ function renderFindingsCardsHtml(findings, showStatus){
         </div>
       </div>
       <div style="font-size:13px;margin:5px 0;">${f.text}</div>
-      ${f.note?`<div style="font-size:12px;color:var(--text-dim);">Evaluasi: ${f.note}</div>`:''}
-      ${f.recommendation?`<div style="font-size:12px;color:var(--teal);margin-top:3px;">→ ${f.recommendation}</div>`:''}
+      ${f.note?`<div style="font-size:12px;color:var(--text-dim);white-space:pre-line;">Evaluasi: ${nl2br(f.note)}</div>`:''}
+      ${f.recommendation?`<div style="font-size:12px;color:var(--teal);margin-top:3px;white-space:pre-line;">→ ${nl2br(f.recommendation)}</div>`:''}
       ${f.dueDate?`<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">Due date: ${new Date(f.dueDate).toLocaleDateString('id-ID',{dateStyle:'long'})}</div>`:''}
       <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${showStatus?'Tindak lanjut':'Tanggapan Pemilik Proses'}: ${escapeHtml(tlText)}</div>
     </div>`;
@@ -3254,6 +3254,12 @@ function escapeAttr(str){
 }
 function escapeHtml(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+// Sama seperti escapeHtml, tapi baris baru (\n) diubah jadi <br> — dipakai untuk menampilkan
+// teks multi-baris (mis. rekomendasi/catatan bernomor "1. ... 2. ...") supaya setiap poin
+// tetap tampil di baris terpisah, tidak menyambung jadi satu paragraf.
+function nl2br(str){
+  return escapeHtml(str).replace(/\n/g,'<br>');
 }
 
 function toggleStdCard(key){
@@ -3723,8 +3729,8 @@ async function renderAdminFindings(){
       <td style="padding:10px 12px;font-family:var(--font-mono);">${r.nomor}</td>
       <td style="padding:10px 12px;">${r.unit}</td>
       <td style="padding:10px 12px;">${r.tanggal}</td>
-      <td style="padding:10px 12px;white-space:normal;max-width:220px;">${escapeHtml(r.temuan)}</td>
-      <td style="padding:10px 12px;white-space:normal;max-width:220px;">${escapeHtml(r.rekomendasi)}</td>
+      <td style="padding:10px 12px;white-space:pre-line;max-width:220px;">${nl2br(r.temuan)}</td>
+      <td style="padding:10px 12px;white-space:pre-line;max-width:220px;">${nl2br(r.rekomendasi)}</td>
       <td style="padding:10px 12px;">${escapeHtml(r.pic)}</td>
       <td style="padding:10px 12px;white-space:normal;max-width:200px;">${escapeHtml(r.tlLine1)}<br><span style="color:var(--text-faint);">${escapeHtml(r.tlLine2)}</span></td>
       <td style="padding:10px 12px;">${r.status==='-' ? '<span style="color:var(--text-faint);">—</span>' : `<span class="sev-tag ${r.status==='CLOSE'?'ok':'major'}">${r.status}</span>`}</td>
