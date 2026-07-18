@@ -270,6 +270,12 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 .thumb-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .thumb{width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative;}
 .thumb img{width:100%;height:100%;object-fit:cover;}
+.thumb{cursor:zoom-in;}
+.photo-lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:32px;}
+.photo-lightbox.hidden{display:none;}
+.photo-lightbox img{max-width:100%;max-height:100%;border-radius:6px;object-fit:contain;}
+.photo-lightbox-close{position:fixed;top:18px;right:22px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.12);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer;border:1px solid rgba(255,255,255,0.25);}
+.photo-lightbox-close:hover{background:rgba(255,255,255,0.22);}
 
 /* signature */
 .sig-pad{background:#fff;border-radius:var(--radius);width:100%;touch-action:none;height:150px;}
@@ -681,13 +687,23 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       </button>
 
       <div class="field">
-        <label>FOTO BUKTI (watermark otomatis: waktu, GPS, area)</label>
+        <label>BUKTI / EVIDEN</label>
         <input type="file" accept="image/*" capture="environment" id="modal-photo-input" style="display:none">
-        <button class="icon-btn" onclick="document.getElementById('modal-photo-input').click()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <span>Ambil foto</span>
-        </button>
+        <input type="file" id="modal-evidence-file" style="display:none">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="icon-btn" onclick="document.getElementById('modal-photo-input').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span>Ambil foto</span>
+          </button>
+          <button class="icon-btn" onclick="document.getElementById('modal-evidence-file').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            <span>Unggah dokumen</span>
+          </button>
+        </div>
+        <p style="font-size:11px;color:var(--text-faint);line-height:1.5;margin:8px 0 0;">Foto otomatis diberi watermark waktu, GPS, dan area.</p>
         <div class="thumb-row" id="modal-thumbs"></div>
+        <div id="modal-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
+        <input class="input" id="modal-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
 
       <div class="field" id="modal-duedate-wrap">
@@ -758,10 +774,17 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div class="field" id="fu-evidence-field">
         <label>BUKTI / EVIDEN</label>
         <input type="file" id="fu-evidence-file" style="display:none">
-        <button class="icon-btn" id="fu-btn-upload" onclick="document.getElementById('fu-evidence-file').click()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
-          <span>Unggah dokumen</span>
-        </button>
+        <input type="file" accept="image/*" capture="environment" id="fu-evidence-photo" style="display:none">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="icon-btn" id="fu-btn-photo" onclick="document.getElementById('fu-evidence-photo').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span>Ambil foto</span>
+          </button>
+          <button class="icon-btn" id="fu-btn-upload" onclick="document.getElementById('fu-evidence-file').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            <span>Unggah dokumen</span>
+          </button>
+        </div>
         <div id="fu-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
         <input class="input" id="fu-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
@@ -790,6 +813,11 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 
       <button class="btn btn-primary" onclick="saveFollowUp()">Simpan Tindak Lanjut</button>
     </div>
+  </div>
+
+  <div class="photo-lightbox hidden" id="photo-lightbox" onclick="closePhotoLightbox()">
+    <div class="photo-lightbox-close" onclick="closePhotoLightbox()">&times;</div>
+    <img id="photo-lightbox-img" src="" onclick="event.stopPropagation()">
   </div>
 
   <div class="bottomnav">
@@ -1550,7 +1578,7 @@ function getRecommendation(text){
 /* ---------- App state ---------- */
 let state = {
   id:null, nomor:null, unit:'', standard:'', auditor:'', auditorUsername:'', createdAt:null,
-  items:[], // {code,text,rating,note,photos:[],recommendation,dueDate,followUp:{}}
+  items:[], // {code,text,rating,note,photos:[],recommendation,dueDate,evidenceLink,evidenceFileName,evidenceFileData,followUp:{}}
   auditeeUsername:'', auditeeName:'', sigAuditor:null, sigAuditee:null, closed:false,
   approvalStatus:'draft', sentForApprovalAt:null, approvedAt:null, followUpReport:null, closingLog:[]
 };
@@ -2023,7 +2051,7 @@ document.getElementById('btn-start-audit').addEventListener('click', async ()=>{
     id:'sess_'+Date.now(), nomor,
     unit, standard:selectedStandard, auditor, auditorUsername: currentUser.username,
     createdAt:new Date().toISOString(),
-    items: lib.items.map(it=>({code:it.code, text:it.text, rating:null, note:'', photos:[], recommendation:null, dueDate:null, followUp:null})),
+    items: lib.items.map(it=>({code:it.code, text:it.text, rating:null, note:'', photos:[], recommendation:null, dueDate:null, evidenceLink:'', evidenceFileName:'', evidenceFileData:'', followUp:null})),
     auditeeUsername, auditeeName:'', sigAuditor:null, sigAuditee:null, closed:false,
     approvalStatus:'draft', sentForApprovalAt:null, approvedAt:null, followUpReport:null, closingLog:[]
   };
@@ -2183,6 +2211,8 @@ function openDetail(idx){
   document.getElementById('modal-rec-edit').value=it.recommendation||'';
   document.getElementById('modal-duedate').value=it.dueDate||'';
   document.getElementById('modal-duedate-optional-tag').classList.toggle('hidden', it.rating!=='ofi');
+  document.getElementById('modal-evidence-link').value=it.evidenceLink||'';
+  document.getElementById('modal-evidence-filename').textContent = it.evidenceFileName? '📎 '+it.evidenceFileName : '';
   document.getElementById('modal-detail').classList.remove('hidden');
   checkModalSaveEnabled();
 }
@@ -2197,20 +2227,44 @@ function checkModalSaveEnabled(){
   btn.disabled = !(note && rec && (isOfi || due));
 }
 function closeModal(){ document.getElementById('modal-detail').classList.add('hidden'); }
+function openPhotoLightbox(src){
+  document.getElementById('photo-lightbox-img').src=src;
+  document.getElementById('photo-lightbox').classList.remove('hidden');
+}
+function closePhotoLightbox(){
+  document.getElementById('photo-lightbox').classList.add('hidden');
+  document.getElementById('photo-lightbox-img').src='';
+}
 function renderThumbs(){
   const it=state.items[activeItemIndex];
-  document.getElementById('modal-thumbs').innerHTML = (it.photos||[]).map(p=>`<div class="thumb"><img src="${p}"></div>`).join('');
+  document.getElementById('modal-thumbs').innerHTML = (it.photos||[]).map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('');
 }
 function saveModal(){
   const it=state.items[activeItemIndex];
   it.note=document.getElementById('modal-note').value;
   it.recommendation=document.getElementById('modal-rec-edit').value;
   it.dueDate=document.getElementById('modal-duedate').value||null;
+  it.evidenceLink=document.getElementById('modal-evidence-link').value;
   dbPut(state);
   closeModal();
   renderChecklist();
   toast('Evaluasi disimpan');
 }
+document.getElementById('modal-evidence-file').addEventListener('change', function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  if(file.size > 4*1024*1024){ toast('Ukuran berkas maksimal 4MB'); e.target.value=''; return; }
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const it=state.items[activeItemIndex];
+    it.evidenceFileData=ev.target.result;
+    it.evidenceFileName=file.name;
+    document.getElementById('modal-evidence-filename').textContent='📎 '+file.name;
+    toast('Berkas bukti terlampir');
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+});
 
 /* ---------- AI-assisted recommendation ---------- */
 async function callAI(prompt){
@@ -2494,6 +2548,7 @@ function openFollowUp(idx){
   linkEl.value=it.followUp.evidenceLink||'';
   linkEl.disabled=!isAuditee;
   document.getElementById('fu-btn-upload').style.display = isAuditee? 'flex':'none';
+  document.getElementById('fu-btn-photo').style.display = isAuditee? 'flex':'none';
   document.getElementById('fu-evidence-filename').textContent = it.followUp.evidenceFileName? '📎 '+it.followUp.evidenceFileName : (isAuditee? '' : 'Belum ada berkas bukti.');
 
   document.getElementById('fu-auditor-response-wrap').classList.toggle('hidden', currentUser.role!=='auditor');
@@ -2533,6 +2588,21 @@ document.getElementById('fu-evidence-file').addEventListener('change', function(
     it.followUp.evidenceFileName=file.name;
     document.getElementById('fu-evidence-filename').textContent='📎 '+file.name;
     toast('Berkas bukti terlampir');
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+});
+document.getElementById('fu-evidence-photo').addEventListener('change', function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  if(file.size > 4*1024*1024){ toast('Ukuran berkas maksimal 4MB'); e.target.value=''; return; }
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const it=state.items[fuActiveIdx];
+    it.followUp.evidenceFileData=ev.target.result;
+    it.followUp.evidenceFileName=file.name;
+    document.getElementById('fu-evidence-filename').textContent='📎 '+file.name;
+    toast('Foto bukti terlampir');
   };
   reader.readAsDataURL(file);
   e.target.value='';
@@ -2618,7 +2688,7 @@ function renderFindings(){
       </div>
       <div style="font-size:13.5px;margin:6px 0;line-height:1.5;">${f.text}</div>
       ${f.note?`<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:6px;white-space:pre-line;">📝 ${nl2br(f.note)}</div>`:''}
-      ${f.photos.length?`<div class="thumb-row">${f.photos.map(p=>`<div class="thumb"><img src="${p}"></div>`).join('')}</div>`:''}
+      ${f.photos.length?`<div class="thumb-row">${f.photos.map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('')}</div>`:''}
       ${f.recommendation?`<div class="rec-box" style="white-space:pre-line;"><b>Rekomendasi</b>${nl2br(f.recommendation)}</div>`:''}
       ${latestHistoryLine(f.followUp)}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
