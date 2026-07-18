@@ -947,7 +947,7 @@ async function dbPutNotification(notif){
    ke backend saat online, dan menarik perubahan dari perangkat lain.
    Kosongkan API_BASE_URL untuk memakai aplikasi 100% lokal seperti sebelumnya.
    ========================================================= */
-const API_BASE_URL = ""; // contoh: "https://api.auditiix.example.com/api"
+const API_BASE_URL = "https://auditiix-backend.onrender.com/api";
 
 function apiBaseUrl(){ return (MASTER.apiBaseUrlOverride || API_BASE_URL || '').replace(/\/$/,''); }
 function syncConfigured(){ return !!apiBaseUrl(); }
