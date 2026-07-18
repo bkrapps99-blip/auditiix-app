@@ -1164,7 +1164,7 @@ async function runSync(){
       await saveMaster();
     }
     updateNetStatus('synced');
-    if(typeof refreshSavedSessions==='function') refreshSavedSessions();
+    if(typeof refreshVisibleScreenData==='function') refreshVisibleScreenData();
     if(typeof refreshNotifBadge==='function') refreshNotifBadge();
     if(typeof refreshSyncPanel==='function') refreshSyncPanel();
   }catch(e){
@@ -1860,7 +1860,9 @@ function renderAuditeeOptions(){
 }
 
 /* ---------- Navigation ---------- */
+let currentScreenName='home';
 function showScreen(name){
+  currentScreenName=name;
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
   document.getElementById('screen-'+name).classList.remove('hidden');
   document.querySelectorAll('.navbtn').forEach(n=>n.classList.toggle('active', n.dataset.nav===name));
@@ -1880,6 +1882,20 @@ function showScreen(name){
   }
   if(name==='home') refreshSavedSessions();
   if(currentUser) markNotifRead(name);
+}
+// Re-render data untuk layar yang SEDANG DIBUKA — dipanggil setelah sinkronisasi selesai,
+// supaya layar seperti Rekap/Daftar Temuan tidak "nyangkut" menampilkan data lama/kosong
+// kalau sinkronisasi baru selesai setelah layar itu sudah terbuka duluan.
+function refreshVisibleScreenData(){
+  const name=currentScreenName;
+  if(name==='checklist') renderChecklist();
+  if(name==='findings') renderFindings();
+  if(name==='closing') renderClosing();
+  if(name==='rekap') renderRekap();
+  if(name==='admin-findings') renderAdminFindings();
+  if(name==='standards') renderStandardsManage();
+  if(name==='access') renderUsersManage();
+  if(name==='home') refreshSavedSessions();
 }
 document.querySelectorAll('.navbtn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
