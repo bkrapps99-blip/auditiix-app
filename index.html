@@ -776,9 +776,12 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 
       <div class="field" id="fu-evidence-field">
         <label>BUKTI / EVIDEN</label>
+        <div id="fu-evidence-summary"></div>
+        <div class="thumb-row" id="fu-thumbs"></div>
+        <div id="fu-evidence-owner-label" style="font-size:11px;color:var(--text-faint);margin-top:10px;"></div>
         <input type="file" id="fu-evidence-file" style="display:none">
         <input type="file" accept="image/*" capture="environment" id="fu-evidence-photo" style="display:none">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
           <button class="icon-btn" id="fu-btn-photo" onclick="document.getElementById('fu-evidence-photo').click()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             <span>Ambil foto</span>
@@ -788,8 +791,6 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
             <span>Unggah dokumen</span>
           </button>
         </div>
-        <div id="fu-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
-        <div class="thumb-row" id="fu-thumbs"></div>
         <div id="fu-evidence-link-saved" style="font-size:12px;margin-top:8px;"></div>
         <input class="input" id="fu-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
@@ -2618,13 +2619,19 @@ function openFollowUp(idx){
   noteEl.style.opacity = isAuditee? 1 : 0.75;
   document.getElementById('fu-btn-voice').style.display = isAuditee? 'flex':'none';
 
+  document.getElementById('fu-evidence-summary').innerHTML =
+    renderEvidenceRowHtml('Bukti Evaluator', it.evidenceFileName, it.evidenceFileData, it.evidenceLink) +
+    renderEvidenceRowHtml('Bukti Pemilik Proses', it.followUp.evidenceFileName, it.followUp.evidenceFileData, it.followUp.evidenceLink);
+
   const linkEl=document.getElementById('fu-evidence-link');
   linkEl.value='';
-  linkEl.disabled=!isAuditee;
-  document.getElementById('fu-evidence-link-saved').innerHTML = renderSavedLink(it.followUp.evidenceLink);
+  linkEl.classList.toggle('hidden', !isAuditee);
+  const linkSavedEl=document.getElementById('fu-evidence-link-saved');
+  linkSavedEl.innerHTML = isAuditee? renderSavedLink(it.followUp.evidenceLink) : '';
+  linkSavedEl.classList.toggle('hidden', !isAuditee);
   document.getElementById('fu-btn-upload').style.display = isAuditee? 'flex':'none';
   document.getElementById('fu-btn-photo').style.display = isAuditee? 'flex':'none';
-  document.getElementById('fu-evidence-filename').innerHTML = it.followUp.evidenceFileName? renderEvidenceLink(it.followUp.evidenceFileName, it.followUp.evidenceFileData) : (isAuditee? '' : 'Belum ada berkas bukti.');
+  document.getElementById('fu-evidence-owner-label').textContent = '';
   renderFuThumbs();
 
   document.getElementById('fu-auditor-response-wrap').classList.toggle('hidden', currentUser.role!=='auditor');
@@ -2654,10 +2661,16 @@ function setFuStatus(s){
 }
 function renderFuThumbs(){
   const it=state.items[fuActiveIdx];
-  const photos=(it && it.followUp && it.followUp.photos) || [];
-  document.getElementById('fu-thumbs').innerHTML = photos.map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('');
+  if(!it) return;
+  document.getElementById('fu-thumbs').innerHTML = renderPhotoThumbsHtml(it.photos, it.followUp && it.followUp.photos);
 }
 function closeFollowUp(){ document.getElementById('modal-followup').classList.add('hidden'); }
+function refreshFuEvidenceSummary(){
+  const it=state.items[fuActiveIdx];
+  document.getElementById('fu-evidence-summary').innerHTML =
+    renderEvidenceRowHtml('Bukti Evaluator', it.evidenceFileName, it.evidenceFileData, it.evidenceLink) +
+    renderEvidenceRowHtml('Bukti Pemilik Proses', it.followUp.evidenceFileName, it.followUp.evidenceFileData, it.followUp.evidenceLink);
+}
 document.getElementById('fu-evidence-file').addEventListener('change', function(e){
   const file=e.target.files[0];
   if(!file) return;
@@ -2667,7 +2680,8 @@ document.getElementById('fu-evidence-file').addEventListener('change', function(
     const it=state.items[fuActiveIdx];
     it.followUp.evidenceFileData=ev.target.result;
     it.followUp.evidenceFileName=file.name;
-    document.getElementById('fu-evidence-filename').innerHTML = renderEvidenceLink(file.name, ev.target.result);
+    dbPut(state);
+    refreshFuEvidenceSummary();
     toast('Berkas bukti terlampir');
   };
   reader.readAsDataURL(file);
@@ -2692,13 +2706,18 @@ async function saveFollowUp(){
   const now=new Date().toISOString();
   if(!it.followUp.history) it.followUp.history=[];
   let notifyTarget=null, notifyMsg=null;
+
+  // Bukti/eviden (link): hanya Pemilik Proses yang mengisi lewat popup ini
   if(isAuditee){
-    const noteVal=document.getElementById('fu-note').value;
-    it.followUp.note=noteVal;
     const linkVal=document.getElementById('fu-evidence-link').value.trim();
     if(linkVal){ it.followUp.evidenceLink=linkVal; }
     document.getElementById('fu-evidence-link-saved').innerHTML = renderSavedLink(it.followUp.evidenceLink);
     document.getElementById('fu-evidence-link').value='';
+  }
+
+  if(isAuditee){
+    const noteVal=document.getElementById('fu-note').value;
+    it.followUp.note=noteVal;
     if(noteVal.trim()){
       it.followUp.history.push({type:'auditee', text:noteVal.trim(), at:now, by:currentUser.fullName});
       if(state.auditorUsername){
