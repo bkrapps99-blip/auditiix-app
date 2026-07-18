@@ -705,6 +705,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
         <p style="font-size:11px;color:var(--text-faint);line-height:1.5;margin:8px 0 0;">Foto otomatis diberi watermark waktu, GPS, dan area.</p>
         <div class="thumb-row" id="modal-thumbs"></div>
         <div id="modal-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
+        <div id="modal-evidence-link-saved" style="font-size:12px;margin-top:8px;"></div>
         <input class="input" id="modal-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
 
@@ -789,6 +790,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
         </div>
         <div id="fu-evidence-filename" style="font-size:12px;color:var(--teal);margin-top:8px;"></div>
         <div class="thumb-row" id="fu-thumbs"></div>
+        <div id="fu-evidence-link-saved" style="font-size:12px;margin-top:8px;"></div>
         <input class="input" id="fu-evidence-link" placeholder="atau tempel tautan (Google Drive, dsb.)" style="margin-top:8px;">
       </div>
 
@@ -2214,7 +2216,8 @@ function openDetail(idx){
   document.getElementById('modal-rec-edit').value=it.recommendation||'';
   document.getElementById('modal-duedate').value=it.dueDate||'';
   document.getElementById('modal-duedate-optional-tag').classList.toggle('hidden', it.rating!=='ofi');
-  document.getElementById('modal-evidence-link').value=it.evidenceLink||'';
+  document.getElementById('modal-evidence-link-saved').innerHTML = renderSavedLink(it.evidenceLink);
+  document.getElementById('modal-evidence-link').value='';
   document.getElementById('modal-evidence-filename').innerHTML = renderEvidenceLink(it.evidenceFileName, it.evidenceFileData);
   document.getElementById('modal-detail').classList.remove('hidden');
   checkModalSaveEnabled();
@@ -2238,21 +2241,35 @@ function closePhotoLightbox(){
   document.getElementById('photo-lightbox').classList.add('hidden');
   document.getElementById('photo-lightbox-img').src='';
 }
+// Gabungkan foto Evaluator & Pemilik Proses jadi satu baris thumbnail, masing-masing diberi
+// tanda (E) untuk Evaluator dan (P) untuk Pemilik Proses.
+function renderPhotoThumbsHtml(evalPhotos, auditeePhotos){
+  const all=(evalPhotos||[]).map(p=>({src:p, badge:'E', title:'Foto Evaluator', cls:'eval'}))
+    .concat((auditeePhotos||[]).map(p=>({src:p, badge:'P', title:'Foto Pemilik Proses', cls:'auditee'})));
+  return all.map(ph=>`<div class="thumb" title="${ph.title}" onclick="openPhotoLightbox('${ph.src}')"><img src="${ph.src}"><span class="thumb-badge thumb-badge-${ph.cls}">${ph.badge}</span></div>`).join('');
+}
+// Baris kecil menampilkan berkas/tautan eviden milik satu pihak (Evaluator atau Pemilik Proses),
+// dipakai di layar "Evaluasi" supaya eviden tetap terlihat tanpa perlu buka pop-up.
+function renderEvidenceRowHtml(ownerLabel, fileName, fileData, link){
+  const parts=[];
+  if(fileName && fileData) parts.push(renderEvidenceLink(fileName, fileData));
+  if(link) parts.push(renderSavedLink(link));
+  if(!parts.length) return '';
+  return `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${ownerLabel}: ${parts.join(' &nbsp;·&nbsp; ')}</div>`;
+}
 function renderThumbs(){
   const it=state.items[activeItemIndex];
-  const evalPhotos=(it.photos||[]).map(p=>({src:p, badge:'E', title:'Foto Evaluator'}));
-  const auditeePhotos=((it.followUp && it.followUp.photos) || []).map(p=>({src:p, badge:'P', title:'Foto Pemilik Proses'}));
-  const all=evalPhotos.concat(auditeePhotos);
-  document.getElementById('modal-thumbs').innerHTML = all.map(ph=>
-    `<div class="thumb" title="${ph.title}" onclick="openPhotoLightbox('${ph.src}')"><img src="${ph.src}"><span class="thumb-badge thumb-badge-${ph.badge==='E'?'eval':'auditee'}">${ph.badge}</span></div>`
-  ).join('');
+  document.getElementById('modal-thumbs').innerHTML = renderPhotoThumbsHtml(it.photos, it.followUp && it.followUp.photos);
 }
 function saveModal(){
   const it=state.items[activeItemIndex];
   it.note=document.getElementById('modal-note').value;
   it.recommendation=document.getElementById('modal-rec-edit').value;
   it.dueDate=document.getElementById('modal-duedate').value||null;
-  it.evidenceLink=document.getElementById('modal-evidence-link').value;
+  const linkVal=document.getElementById('modal-evidence-link').value.trim();
+  if(linkVal){ it.evidenceLink=linkVal; }
+  document.getElementById('modal-evidence-link-saved').innerHTML = renderSavedLink(it.evidenceLink);
+  document.getElementById('modal-evidence-link').value='';
   dbPut(state);
   closeModal();
   renderChecklist();
@@ -2442,7 +2459,7 @@ Catatan evaluasi evaluator: ${noteNow || '(tidak ada catatan tambahan)'}`;
 /* ---------- Photo capture with watermark ---------- */
 // Fungsi bersama: ambil file foto, gambar watermark (label + waktu + GPS), lalu panggil onDone(dataUrl).
 // label membedakan sumber foto, mis. "COMPLYSHIELD" (Evaluator) vs "PEMILIK PROSES" (Auditee).
-function capturePhotoWithWatermark(file, label, onDone){
+function capturePhotoWithWatermark(file, onDone){
   const img=new Image();
   const reader=new FileReader();
   reader.onload=function(ev){
@@ -2458,20 +2475,61 @@ function capturePhotoWithWatermark(file, label, onDone){
         const barH=Math.max(46, canvas.height*0.09);
         ctx.fillStyle='rgba(10,14,17,0.72)';
         ctx.fillRect(0, canvas.height-barH, canvas.width, barH);
-        ctx.fillStyle='#F2A93B';
         const fs=Math.max(11, canvas.width*0.024);
+
+        // Kiri bawah: Nama Lengkap – Objek Evaluasi, lalu tanggal/waktu, lalu GPS
+        ctx.fillStyle='#F2A93B';
         ctx.font=`600 ${fs}px monospace`;
-        const now=new Date();
-        const ts=now.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'medium'});
-        ctx.fillText(label+' · '+state.unit, 10, canvas.height-barH+fs+4);
+        const namaLengkap=(currentUser && currentUser.fullName) ? currentUser.fullName : '—';
+        ctx.fillText(namaLengkap+' – '+(state.unit||'—'), 10, canvas.height-barH+fs+4);
         ctx.fillStyle='#EAEFF1';
         ctx.font=`400 ${fs*0.85}px monospace`;
+        const now=new Date();
+        const ts=now.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'medium'});
         ctx.fillText(ts, 10, canvas.height-barH+fs*2+8);
         if(lat!=null){
           ctx.fillText(`GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, 10, canvas.height-barH+fs*3+12);
         } else {
           ctx.fillText('GPS: tidak tersedia', 10, canvas.height-barH+fs*3+12);
         }
+
+        // Kanan bawah: logo perisai + "ComplyShield", putih transparan 70% (meniru logo header)
+        ctx.save();
+        ctx.globalAlpha=0.7;
+        const logoSize=barH*0.55;
+        const padR=10;
+        ctx.font=`700 ${fs}px 'Segoe UI', Arial, sans-serif`;
+        const label='ComplyShield';
+        const textW=ctx.measureText(label).width;
+        const groupW=logoSize+6+textW;
+        const groupX=canvas.width-padR-groupW;
+        const groupYc=canvas.height-barH/2;
+        const lx=groupX, ly=groupYc-logoSize/2, s=logoSize/24;
+
+        ctx.strokeStyle='#FFFFFF';
+        ctx.lineWidth=Math.max(1.3, logoSize*0.09);
+        ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath();
+        ctx.moveTo(lx+12*s, ly+2*s);
+        ctx.lineTo(lx+20*s, ly+5*s);
+        ctx.lineTo(lx+20*s, ly+11*s);
+        ctx.bezierCurveTo(lx+20*s, ly+16*s, lx+16.5*s, ly+20*s, lx+12*s, ly+22*s);
+        ctx.bezierCurveTo(lx+7.5*s, ly+20*s, lx+4*s, ly+16*s, lx+4*s, ly+11*s);
+        ctx.lineTo(lx+4*s, ly+5*s);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(lx+8.5*s, ly+12.2*s);
+        ctx.lineTo(lx+10.9*s, ly+14.6*s);
+        ctx.lineTo(lx+15.5*s, ly+9.5*s);
+        ctx.stroke();
+
+        ctx.fillStyle='#FFFFFF';
+        ctx.textBaseline='middle';
+        ctx.fillText(label, groupX+logoSize+6, groupYc);
+        ctx.textBaseline='alphabetic';
+        ctx.restore();
+
         const dataUrl=canvas.toDataURL('image/jpeg',0.85);
         onDone(dataUrl);
       };
@@ -2490,7 +2548,7 @@ function capturePhotoWithWatermark(file, label, onDone){
 document.getElementById('modal-photo-input').addEventListener('change', function(e){
   const file=e.target.files[0];
   if(!file) return;
-  capturePhotoWithWatermark(file, 'COMPLYSHIELD', (dataUrl)=>{
+  capturePhotoWithWatermark(file, (dataUrl)=>{
     state.items[activeItemIndex].photos.push(dataUrl);
     dbPut(state);
     renderThumbs();
@@ -2561,8 +2619,9 @@ function openFollowUp(idx){
   document.getElementById('fu-btn-voice').style.display = isAuditee? 'flex':'none';
 
   const linkEl=document.getElementById('fu-evidence-link');
-  linkEl.value=it.followUp.evidenceLink||'';
+  linkEl.value='';
   linkEl.disabled=!isAuditee;
+  document.getElementById('fu-evidence-link-saved').innerHTML = renderSavedLink(it.followUp.evidenceLink);
   document.getElementById('fu-btn-upload').style.display = isAuditee? 'flex':'none';
   document.getElementById('fu-btn-photo').style.display = isAuditee? 'flex':'none';
   document.getElementById('fu-evidence-filename').innerHTML = it.followUp.evidenceFileName? renderEvidenceLink(it.followUp.evidenceFileName, it.followUp.evidenceFileData) : (isAuditee? '' : 'Belum ada berkas bukti.');
@@ -2619,7 +2678,7 @@ document.getElementById('fu-evidence-photo').addEventListener('change', function
   if(!file) return;
   const it=state.items[fuActiveIdx];
   if(!it.followUp.photos) it.followUp.photos=[];
-  capturePhotoWithWatermark(file, 'PEMILIK PROSES', (dataUrl)=>{
+  capturePhotoWithWatermark(file, (dataUrl)=>{
     it.followUp.photos.push(dataUrl);
     dbPut(state);
     renderFuThumbs();
@@ -2636,7 +2695,10 @@ async function saveFollowUp(){
   if(isAuditee){
     const noteVal=document.getElementById('fu-note').value;
     it.followUp.note=noteVal;
-    it.followUp.evidenceLink=document.getElementById('fu-evidence-link').value;
+    const linkVal=document.getElementById('fu-evidence-link').value.trim();
+    if(linkVal){ it.followUp.evidenceLink=linkVal; }
+    document.getElementById('fu-evidence-link-saved').innerHTML = renderSavedLink(it.followUp.evidenceLink);
+    document.getElementById('fu-evidence-link').value='';
     if(noteVal.trim()){
       it.followUp.history.push({type:'auditee', text:noteVal.trim(), at:now, by:currentUser.fullName});
       if(state.auditorUsername){
@@ -2708,7 +2770,9 @@ function renderFindings(){
       </div>
       <div style="font-size:13.5px;margin:6px 0;line-height:1.5;">${f.text}</div>
       ${f.note?`<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:6px;white-space:pre-line;">📝 ${nl2br(f.note)}</div>`:''}
-      ${f.photos.length?`<div class="thumb-row">${f.photos.map(p=>`<div class="thumb" onclick="openPhotoLightbox('${p}')"><img src="${p}"></div>`).join('')}</div>`:''}
+      ${(f.photos.length || (f.followUp && f.followUp.photos && f.followUp.photos.length)) ? `<div class="thumb-row">${renderPhotoThumbsHtml(f.photos, f.followUp && f.followUp.photos)}</div>` : ''}
+      ${renderEvidenceRowHtml('Bukti Evaluator', f.evidenceFileName, f.evidenceFileData, f.evidenceLink)}
+      ${renderEvidenceRowHtml('Bukti Pemilik Proses', f.followUp && f.followUp.evidenceFileName, f.followUp && f.followUp.evidenceFileData, f.followUp && f.followUp.evidenceLink)}
       ${f.recommendation?`<div class="rec-box" style="white-space:pre-line;"><b>Rekomendasi</b>${nl2br(f.recommendation)}</div>`:''}
       ${latestHistoryLine(f.followUp)}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
@@ -3356,6 +3420,11 @@ function nl2br(str){
 function renderEvidenceLink(fileName, fileData){
   if(!fileName || !fileData) return '';
   return `<a href="${fileData}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;cursor:pointer;">📎 ${escapeHtml(fileName)}</a>`;
+}
+// Tautan eviden yang sudah tersimpan, ditampilkan di ATAS kolom input sebagai link yang bisa diklik.
+function renderSavedLink(url){
+  if(!url) return '';
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;cursor:pointer;word-break:break-all;">🔗 ${escapeHtml(url)}</a>`;
 }
 
 function toggleStdCard(key){
