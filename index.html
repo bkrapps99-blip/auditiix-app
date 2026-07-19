@@ -374,6 +374,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <label>MODE LOGIN</label>
       <div class="chip-select" id="login-role-select">
         <div class="chip-opt" data-val="auditor">Evaluator</div>
+        <div class="chip-opt" data-val="lead">Lead</div>
         <div class="chip-opt" data-val="auditee">Pemilik Proses</div>
         <div class="chip-opt" data-val="admin">Admin</div>
       </div>
@@ -439,6 +440,30 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 
   <!-- ============ SCREEN: HOME ============ -->
   <div class="screen" id="screen-home">
+    <div id="home-lead-card" class="hidden">
+      <div class="eyebrow">Rekap Hasil Evaluasi Kepatuhan</div>
+      <h1 class="page-title">Rekap sesi evaluasi kepatuhan</h1>
+      <p class="page-sub">Pilih satu atau beberapa sesi berstatus <b>Disetujui</b> atau <b>Selesai</b> di bawah untuk digabung jadi satu laporan rekap.</p>
+
+      <div class="field">
+        <label>OBJEK EVALUASI KEPATUHAN</label>
+        <input class="input" id="lead-inp-objek" placeholder="mis. Rekap Triwulan III 2026 — PLTA Wlingi">
+      </div>
+      <div class="field">
+        <label>NAMA LEAD EVALUATOR</label>
+        <input class="input" id="lead-inp-nama" disabled style="opacity:0.75;cursor:not-allowed;">
+      </div>
+      <div class="field">
+        <label>PEMILIK PROSES (PENANGGUNG JAWAB TINDAK LANJUT)</label>
+        <select class="select" id="lead-auditee-select">
+          <option value="">— pilih pemilik proses —</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="btn-start-lead-rekap" onclick="startLeadRekap()" style="margin-top:6px;">Mulai Rekap Sesi Evaluasi Kepatuhan</button>
+      <div id="lead-selected-info" style="font-size:12px;color:var(--text-dim);margin-top:10px;line-height:1.6;"></div>
+      <div class="divider"></div>
+    </div>
     <div id="home-creation-card">
       <div class="eyebrow">Mulai Evaluasi Kepatuhan</div>
       <h1 class="page-title">Objek evaluasi kepatuhan &amp; standar</h1>
@@ -500,6 +525,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div class="stat-box"><b id="stat-minor" style="color:var(--minor)">0</b><span>MINOR</span></div>
       <div class="stat-box"><b id="stat-ofi" style="color:var(--ofi)">0</b><span>OFI</span></div>
     </div>
+    <input class="input hidden" id="lead-findings-search" oninput="onLeadFindingsSearch(this.value)" placeholder="Cari item evaluasi, klausul, No. Evaluasi, objek, evaluator, dsb..." style="margin-bottom:14px;">
     <div id="findings-list"></div>
   </div>
 
@@ -624,6 +650,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
         <div class="chip-select" id="new-user-role-select">
           <div class="chip-opt" data-val="admin">Admin</div>
           <div class="chip-opt" data-val="auditor">Evaluator</div>
+          <div class="chip-opt" data-val="lead">Lead</div>
           <div class="chip-opt" data-val="auditee">Pemilik Proses</div>
         </div>
       </div>
@@ -856,7 +883,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 const PLN_LOGO_DATA_URL = "data:image/png;base64,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";
 
 /* ---------- IndexedDB wrapper ---------- */
-const DB_NAME='auditiix_db', DB_VER=4;
+const DB_NAME='auditiix_db', DB_VER=5;
 let dbInstance=null;
 function openDB(){
   return new Promise((resolve,reject)=>{
@@ -867,6 +894,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('master')) db.createObjectStore('master',{keyPath:'key'});
       if(!db.objectStoreNames.contains('users')) db.createObjectStore('users',{keyPath:'username'});
       if(!db.objectStoreNames.contains('notifications')) db.createObjectStore('notifications',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('leadRekap')) db.createObjectStore('leadRekap',{keyPath:'id'});
     };
     req.onsuccess=e=>resolve(e.target.result);
     req.onerror=e=>reject(e);
@@ -983,6 +1011,39 @@ async function dbPutNotification(notif){
     });
   }catch(e){ return false; }
 }
+async function dbGetAllLeadRekap(){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('leadRekap','readonly');
+      const req=tx.objectStore('leadRekap').getAll();
+      req.onsuccess=()=>res(req.result||[]);
+      req.onerror=()=>res([]);
+    });
+  }catch(e){ return []; }
+}
+async function dbPutLeadRekap(rekap){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('leadRekap','readwrite');
+      tx.objectStore('leadRekap').put(rekap);
+      tx.oncomplete=()=>{ markLeadRekapDirty(rekap.id); res(true); };
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
+async function dbDeleteLeadRekap(id){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('leadRekap','readwrite');
+      tx.objectStore('leadRekap').delete(id);
+      tx.oncomplete=()=>{ deleteLeadRekapFromServer(id); res(true); };
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
 
 /* =========================================================
    Backend sync (offline-first: push/pull to Auditiix backend)
@@ -1059,6 +1120,16 @@ function markNotificationDirty(id){
   if(!MASTER.pendingNotifications.includes(id)) MASTER.pendingNotifications.push(id);
   scheduleSync();
 }
+function markLeadRekapDirty(id){
+  if(!id || !syncConfigured()) return;
+  MASTER.pendingLeadRekap = MASTER.pendingLeadRekap||[];
+  if(!MASTER.pendingLeadRekap.includes(id)) MASTER.pendingLeadRekap.push(id);
+  scheduleSync();
+}
+async function deleteLeadRekapFromServer(id){
+  if(!syncConfigured() || !MASTER.accessToken) return;
+  try{ await apiRequest('/lead-rekap/'+encodeURIComponent(id), {method:'DELETE'}); }catch(e){ console.warn('[sync] hapus rekap lead di server gagal', e); }
+}
 async function deleteSessionFromServer(id){
   if(!syncConfigured()) return {ok:false, reason:'mode-lokal'};
   if(!MASTER.accessToken){
@@ -1097,6 +1168,28 @@ async function dbRawDeleteSession(id){
     return new Promise((res)=>{
       const tx=db.transaction('sessions','readwrite');
       tx.objectStore('sessions').delete(id);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
+async function dbRawPutLeadRekap(rekap){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('leadRekap','readwrite');
+      tx.objectStore('leadRekap').put(rekap);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
+async function dbRawDeleteLeadRekap(id){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('leadRekap','readwrite');
+      tx.objectStore('leadRekap').delete(id);
       tx.oncomplete=()=>res(true);
       tx.onerror=()=>res(false);
     });
@@ -1178,18 +1271,23 @@ async function runSync(){
   try{
     const pendingSessionIds = MASTER.pendingSessions||[];
     const pendingNotifIds = MASTER.pendingNotifications||[];
-    if(pendingSessionIds.length || pendingNotifIds.length){
+    const pendingLeadRekapIds = MASTER.pendingLeadRekap||[];
+    if(pendingSessionIds.length || pendingNotifIds.length || pendingLeadRekapIds.length){
       const allSessions = await dbGetAll();
       const allNotifs = await dbGetNotifications();
+      const allLeadRekap = await dbGetAllLeadRekap();
       const sessionsPayload = allSessions.filter(s=>pendingSessionIds.includes(s.id));
       const notifPayload = allNotifs.filter(n=>pendingNotifIds.includes(n.id));
-      const res = await apiRequest('/sync/push', {method:'POST', body: JSON.stringify({sessions:sessionsPayload, notifications:notifPayload})});
+      const leadRekapPayload = allLeadRekap.filter(r=>pendingLeadRekapIds.includes(r.id));
+      const res = await apiRequest('/sync/push', {method:'POST', body: JSON.stringify({sessions:sessionsPayload, notifications:notifPayload, leadRekap:leadRekapPayload})});
       if(res.ok){
         const result = await res.json();
         const okSessionIds = (result.sessions||[]).filter(r=>r.status==='OK').map(r=>r.id);
         const okNotifIds = (result.notifications||[]).filter(r=>r.status==='OK').map(r=>r.id);
+        const okLeadRekapIds = (result.leadRekap||[]).filter(r=>r.status==='OK').map(r=>r.id);
         MASTER.pendingSessions = pendingSessionIds.filter(id=>!okSessionIds.includes(id));
         MASTER.pendingNotifications = pendingNotifIds.filter(id=>!okNotifIds.includes(id));
+        MASTER.pendingLeadRekap = pendingLeadRekapIds.filter(id=>!okLeadRekapIds.includes(id));
         for(const r of (result.sessions||[])){
           if(r.status==='OK' && r.nomor){
             const local = allSessions.find(s=>s.id===r.id);
@@ -1208,6 +1306,10 @@ async function runSync(){
         else { await dbRawPutSession(s); }
       }
       for(const n of (data.notifications||[])) await dbPutNotification(n);
+      for(const r of (data.leadRekap||[])){
+        if(r.isDeleted){ await dbRawDeleteLeadRekap(r.id); }
+        else { await dbRawPutLeadRekap(r); }
+      }
       if(data.users && data.users.length){
         for(const u of data.users){
           const existing = USERS.find(x=>x.username===u.username);
@@ -1469,7 +1571,7 @@ const DEFAULT_STANDARDS = {
 
 /* ---------- Master data (mutable, persisted in IndexedDB) ---------- */
 let MASTER = { standards: {}, theme: 'light', sessionSeq: {}, loggedInUser: null, aiApiKey: '', aiProvider: 'gemini', loginHistory: [],
-  apiBaseUrlOverride: '', accessToken: null, refreshToken: null, lastSyncAt: null, pendingSessions: [], pendingNotifications: [] };
+  apiBaseUrlOverride: '', accessToken: null, refreshToken: null, lastSyncAt: null, pendingSessions: [], pendingNotifications: [], pendingLeadRekap: [] };
 
 function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -1489,6 +1591,7 @@ async function loadMaster(){
     MASTER.lastSyncAt = saved.lastSyncAt || null;
     MASTER.pendingSessions = saved.pendingSessions || [];
     MASTER.pendingNotifications = saved.pendingNotifications || [];
+    MASTER.pendingLeadRekap = saved.pendingLeadRekap || [];
   } else {
     MASTER.standards = deepClone(DEFAULT_STANDARDS);
     MASTER.theme = 'light';
@@ -1503,12 +1606,13 @@ async function loadMaster(){
     MASTER.lastSyncAt = null;
     MASTER.pendingSessions = [];
     MASTER.pendingNotifications = [];
+    MASTER.pendingLeadRekap = [];
     await saveMaster();
   }
 }
 async function saveMaster(){
   await dbPutMaster({ standards: MASTER.standards, theme: MASTER.theme, sessionSeq: MASTER.sessionSeq, loggedInUser: MASTER.loggedInUser, aiApiKey: MASTER.aiApiKey, aiProvider: MASTER.aiProvider, loginHistory: MASTER.loginHistory,
-    apiBaseUrlOverride: MASTER.apiBaseUrlOverride, accessToken: MASTER.accessToken, refreshToken: MASTER.refreshToken, lastSyncAt: MASTER.lastSyncAt, pendingSessions: MASTER.pendingSessions, pendingNotifications: MASTER.pendingNotifications });
+    apiBaseUrlOverride: MASTER.apiBaseUrlOverride, accessToken: MASTER.accessToken, refreshToken: MASTER.refreshToken, lastSyncAt: MASTER.lastSyncAt, pendingSessions: MASTER.pendingSessions, pendingNotifications: MASTER.pendingNotifications, pendingLeadRekap: MASTER.pendingLeadRekap });
   scheduleStandardsPush();
 }
 
@@ -1675,16 +1779,16 @@ function auditeeDisplayName(sessionObj){
 const NAV_ROLES = {
   rekap: ['admin'],
   'admin-findings': ['admin'],
-  home: ['auditor','auditee'],
+  home: ['auditor','auditee','lead'],
   standards: ['admin'],
   access: ['admin'],
-  settings: ['auditor'],
-  checklist: ['auditor'],
-  findings: ['auditor','auditee'],
-  closing: ['auditor','auditee'],
-  report: ['auditor','auditee']
+  settings: ['auditor'], // untuk 'lead', menu ini dipaksa tampil-tapi-nonaktif secara khusus di applyRolePermissions()
+  checklist: ['auditor','lead'],
+  findings: ['auditor','auditee','lead'],
+  closing: ['auditor','auditee','lead'],
+  report: ['auditor','auditee','lead']
 };
-const DEFAULT_SCREEN = { admin:'rekap', auditor:'home', auditee:'home' };
+const DEFAULT_SCREEN = { admin:'rekap', auditor:'home', auditee:'home', lead:'home' };
 
 let loginRole=null;
 function setLoginRole(role){
@@ -1725,7 +1829,7 @@ async function attemptLogin(){
     const username=document.getElementById('login-username').value.trim();
     const password=document.getElementById('login-password').value;
     if(!storageOk){ showLoginError('Penyimpanan lokal bermasalah — lihat pesan merah di atas. Aplikasi belum bisa dipakai sampai ini teratasi.'); return; }
-    if(!loginRole){ showLoginError('Pilih mode login (Admin/Evaluator/Pemilik Proses) terlebih dahulu.'); return; }
+    if(!loginRole){ showLoginError('Pilih mode login (Admin/Evaluator/Lead/Pemilik Proses) terlebih dahulu.'); return; }
     if(!username || !password){ showLoginError('Isi username dan kata sandi.'); return; }
     if(!USERS.length){ await loadUsers(); }
     const u=findUser(username);
@@ -1757,7 +1861,7 @@ function openLoginHistoryDropdown(){
   const dd=document.getElementById('login-history-dropdown');
   const history=MASTER.loginHistory||[];
   if(!history.length){ dd.classList.add('hidden'); return; }
-  const roleLabel={admin:'Admin',auditor:'Evaluator',auditee:'Pemilik Proses'};
+  const roleLabel={admin:'Admin',auditor:'Evaluator',lead:'Lead',auditee:'Pemilik Proses'};
   dd.innerHTML = history.map(h=>`
     <div class="login-history-row" onclick="selectLoginHistory('${h.username}')">
       <b>${escapeHtml(h.fullName||h.username)}</b>
@@ -1869,6 +1973,8 @@ async function logout(){
   MASTER.loggedInUser=null;
   MASTER.accessToken=null;
   MASTER.refreshToken=null;
+  leadSelectedSessionIds = new Set();
+  leadRekapDraft = null;
   await saveMaster();
   state = {id:null, nomor:null, unit:'', standard:'', auditor:'', auditorUsername:'', createdAt:null, items:[], auditeeUsername:'', auditeeName:'', sigAuditor:null, sigAuditee:null, closed:false, approvalStatus:'draft', sentForApprovalAt:null, approvedAt:null, followUpReport:null, closingLog:[]};
   document.getElementById('unit-label').textContent='PILIH UNIT EVALUASI KEPATUHAN';
@@ -1887,17 +1993,43 @@ function applyRolePermissions(){
   if(currentUser.role==='auditor'){
     document.getElementById('inp-auditor').value = currentUser.fullName;
   }
-  const roleLabel={admin:'Admin',auditor:'Evaluator',auditee:'Pemilik Proses'};
+  if(currentUser.role==='lead'){
+    // Pengaturan: tampil tapi nonaktif khusus untuk Lead (bukan disembunyikan seperti role lain)
+    const settingsBtn=document.querySelector('.navbtn[data-nav="settings"]');
+    if(settingsBtn){ settingsBtn.classList.remove('role-hidden'); settingsBtn.classList.add('nav-disabled'); }
+    // Checklist/Evaluasi/Closing dikunci sampai Lead memulai peninjauan/rekap
+    const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
+    const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
+    const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
+    const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
+    [checklistBtn,findingsBtn,closingBtn,reportBtn].forEach(b=>{ if(b) b.classList.add('nav-disabled'); });
+    const inpLead=document.getElementById('lead-inp-nama');
+    if(inpLead) inpLead.value = currentUser.fullName;
+  }
+  const roleLabel={admin:'Admin',auditor:'Evaluator',lead:'Lead',auditee:'Pemilik Proses'};
   const accEl=document.getElementById('account-info');
   if(accEl){
     accEl.innerHTML = `<b style="color:var(--text);">${escapeHtml(currentUser.fullName)}</b><br>${roleLabel[currentUser.role]||currentUser.role}${currentUser.jabatan? ' · '+escapeHtml(currentUser.jabatan) : ''}`;
     accEl.classList.remove('hidden');
   }
   const creationCard=document.getElementById('home-creation-card');
+  const leadCard=document.getElementById('home-lead-card');
   const heading=document.getElementById('saved-sessions-heading');
   if(creationCard){
-    if(currentUser.role==='auditee'){ creationCard.classList.add('hidden'); if(heading) heading.textContent='Sesi Anda'; }
-    else { creationCard.classList.remove('hidden'); if(heading) heading.textContent='Sesi Tersimpan'; }
+    if(currentUser.role==='lead'){
+      creationCard.classList.add('hidden');
+      if(leadCard) leadCard.classList.remove('hidden');
+      if(heading) heading.textContent='Pilih Sesi untuk Direkap';
+      updateLeadRekapInfo();
+    } else if(currentUser.role==='auditee'){
+      creationCard.classList.add('hidden');
+      if(leadCard) leadCard.classList.add('hidden');
+      if(heading) heading.textContent='Sesi Anda';
+    } else {
+      creationCard.classList.remove('hidden');
+      if(leadCard) leadCard.classList.add('hidden');
+      if(heading) heading.textContent='Sesi Tersimpan';
+    }
   }
   renderAuditeeOptions();
   updateSessionLock();
@@ -1910,12 +2042,14 @@ function updateSessionLock(){
   if(checklistBtn) checklistBtn.classList.toggle('locked', !!(state.id && approved));
 }
 function renderAuditeeOptions(){
-  const sel=document.getElementById('inp-auditee-select');
-  if(!sel) return;
-  const current=sel.value;
   const auditees=USERS.filter(u=>u.role==='auditee');
-  sel.innerHTML='<option value="">— pilih pemilik proses —</option>' +
+  const optionsHtml = (current) => '<option value="">— pilih pemilik proses —</option>' +
     auditees.map(u=>`<option value="${u.username}" ${u.username===current?'selected':''}>${u.fullName}${u.jabatan? ' — '+u.jabatan:''}</option>`).join('');
+  ['inp-auditee-select','lead-auditee-select'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML = optionsHtml(sel.value);
+  });
 }
 
 /* ---------- Navigation ---------- */
@@ -1987,7 +2121,7 @@ function updateNetStatus(mode){
   } else if(!MASTER.accessToken){
     label='ONLINE · BELUM TERSAMBUNG SERVER';
   } else {
-    const pending=(MASTER.pendingSessions||[]).length+(MASTER.pendingNotifications||[]).length;
+    const pending=(MASTER.pendingSessions||[]).length+(MASTER.pendingNotifications||[]).length+(MASTER.pendingLeadRekap||[]).length;
     label = pending>0 ? ('ONLINE · '+pending+' TERTUNDA') : 'ONLINE · TERSINKRON';
   }
   el.querySelector('span').textContent = label;
@@ -2105,6 +2239,33 @@ async function refreshSavedSessions(){
   }
   if(!all.length){ box.innerHTML=`<div class="empty"><p>${term? 'Tidak ada sesi yang cocok dengan pencarian.' : 'Belum ada sesi tersimpan.'}</p></div>`; return; }
   all.sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(currentUser.role==='lead'){
+    box.innerHTML = all.map(s=>{
+      const done=s.items.filter(i=>i.rating).length;
+      const stdLabel = MASTER.standards[s.standard]?.shortLabel || s.standard;
+      const st = APPROVAL_STATUS_MAP[s.approvalStatus||'draft'];
+      const tanggalStr = s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'medium'}) : '-';
+      const ketaatanPct = computeKetaatanPct(s);
+      const selected = leadSelectedSessionIds.has(s.id);
+      return `<div class="card ${selected?'card-tap':'card-tap'}" style="${selected?'border-color:var(--teal);box-shadow:0 0 0 1px var(--teal);':''}cursor:pointer;" onclick="toggleLeadSessionSelect('${s.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            ${selected? '<span style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;">✓</span>' : doughnutImgHtml(ketaatanPct, 40)}
+            <div style="min-width:0;">
+              <div style="font-weight:600;font-size:14px;">${s.unit}</div>
+              <div style="font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">${s.nomor?s.nomor+' · ':''}${stdLabel} · ${done}/${s.items.length} poin</div>
+              <div style="font-size:11px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;">👤 ${escapeHtml(s.auditor||'-')} &nbsp;·&nbsp; 📅 ${tanggalStr}</div>
+            </div>
+          </div>
+          <span class="sev-tag ${st.cls}" style="flex-shrink:0;">${st.label}</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+          <span class="icon-btn btn-sm" onclick="reviewSessionAsLead('${s.id}')">🔍 Tinjau Evaluasi</span>
+        </div>
+      </div>`;
+    }).join('');
+    return;
+  }
   box.innerHTML = all.map(s=>{
     const done=s.items.filter(i=>i.rating).length;
     const stdLabel = MASTER.standards[s.standard]?.shortLabel || s.standard;
@@ -2140,6 +2301,123 @@ async function refreshSavedSessions(){
     </div>`;
   }).join('');
 }
+/* ---------- Lead Evaluator: pilih sesi & mulai rekap ---------- */
+let leadSelectedSessionIds = new Set();
+async function toggleLeadSessionSelect(id){
+  const all=await dbGetAll();
+  const s=all.find(x=>x.id===id);
+  if(!s) return;
+  const qualifies = s.approvalStatus==='approved' || s.approvalStatus==='finalized';
+  if(!leadSelectedSessionIds.has(id)){
+    if(!qualifies){ toast('Sesi ini belum berstatus Disetujui atau Selesai — belum bisa direkap.'); return; }
+    if(leadSelectedSessionIds.size>0){
+      const firstSelected = all.find(x=>leadSelectedSessionIds.has(x.id));
+      if(firstSelected && firstSelected.approvalStatus!==s.approvalStatus){
+        toast('Tidak bisa menggabungkan sesi berstatus Disetujui dengan Selesai dalam satu rekap. Pilih sesi dengan status yang sama.');
+        return;
+      }
+    }
+    leadSelectedSessionIds.add(id);
+  } else {
+    leadSelectedSessionIds.delete(id);
+  }
+  refreshSavedSessions();
+  updateLeadRekapInfo();
+}
+async function updateLeadRekapInfo(){
+  const infoEl=document.getElementById('lead-selected-info');
+  const btn=document.getElementById('btn-start-lead-rekap');
+  if(!infoEl || !btn) return;
+  const count=leadSelectedSessionIds.size;
+  if(!count){
+    infoEl.textContent='Belum ada sesi dipilih. Klik salah satu kartu sesi di bawah untuk memilihnya.';
+    btn.disabled=true;
+    return;
+  }
+  const all=await dbGetAll();
+  const first=all.find(x=>leadSelectedSessionIds.has(x.id));
+  const mode = first && first.approvalStatus==='finalized' ? 'Rekap Tindak Lanjut Evaluasi Kepatuhan' : 'Rekap Hasil Evaluasi Kepatuhan';
+  infoEl.innerHTML = `<b>${count}</b> sesi dipilih &nbsp;·&nbsp; Mode: <b>${mode}</b>`;
+  btn.disabled=false;
+}
+// Tinjau satu sesi tertentu (view-only): Checklist, Evaluasi, Laporan aktif; Closing tetap terkunci.
+async function reviewSessionAsLead(id){
+  const all=await dbGetAll();
+  const s=all.find(x=>x.id===id);
+  if(!s) return;
+  state=s;
+  leadRekapDraft=null; // keluar dari mode rekap gabungan kalau sedang aktif
+  document.getElementById('unit-label').textContent=state.unit.toUpperCase()+(state.nomor?' · '+state.nomor:'');
+  const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
+  const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
+  const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
+  const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
+  if(checklistBtn) checklistBtn.classList.remove('nav-disabled');
+  if(findingsBtn) findingsBtn.classList.remove('nav-disabled');
+  if(reportBtn) reportBtn.classList.remove('nav-disabled');
+  if(closingBtn) closingBtn.classList.add('nav-disabled'); // closing hanya lewat alur "Mulai Rekap"
+  toast('Meninjau: '+state.unit+' (mode tinjau, tidak bisa diedit)');
+  showScreen('findings');
+}
+// Mulai proses rekap gabungan dari sesi-sesi yang sudah dipilih
+let leadRekapDraft=null;
+async function startLeadRekap(){
+  if(!leadSelectedSessionIds.size){ toast('Pilih dulu minimal satu sesi berstatus Disetujui atau Selesai.'); return; }
+  const objek=document.getElementById('lead-inp-objek').value.trim();
+  const auditeeUsername=document.getElementById('lead-auditee-select').value;
+  if(!objek){ toast('Isi Objek Evaluasi Kepatuhan terlebih dahulu.'); return; }
+  if(!auditeeUsername){ toast('Pilih Pemilik Proses terlebih dahulu.'); return; }
+
+  const all=await dbGetAll();
+  const sessions=all.filter(s=>leadSelectedSessionIds.has(s.id));
+  if(!sessions.length){ toast('Sesi yang dipilih tidak ditemukan, coba pilih ulang.'); return; }
+  const mode = sessions[0].approvalStatus==='finalized' ? 'tindak_lanjut' : 'hasil';
+  const auditeeUser = findUser(auditeeUsername);
+
+  const rows = sessions.map(s=>{
+    const findings=s.items.filter(i=>i.rating && i.rating!=='ok');
+    const trackable=findings.filter(f=>f.rating!=='ofi');
+    const openCount=trackable.filter(f=>!(f.followUp&&f.followUp.status==='close')).length;
+    const closeCount=trackable.length-openCount;
+    return {
+      sessionId:s.id, nomor:s.nomor||'-', tanggal:s.createdAt? new Date(s.createdAt).toLocaleDateString('id-ID',{dateStyle:'medium'}):'-',
+      unit:s.unit, standar: MASTER.standards[s.standard]?.shortLabel || s.standard, evaluator:s.auditor||'-',
+      open:openCount, close:closeCount, ketaatan: computeKetaatanPct(s)
+    };
+  });
+  const totalPoin = sessions.reduce((sum,s)=>sum+s.items.length,0);
+
+  leadRekapDraft = {
+    id: 'rekap_'+Date.now(),
+    objekEvaluasi: objek,
+    leadEvaluator: currentUser.fullName,
+    leadEvaluatorUsername: currentUser.username,
+    auditeeUsername,
+    auditeeName: auditeeUser? auditeeUser.fullName : '',
+    sessionIds: sessions.map(s=>s.id),
+    mode,
+    rows,
+    totalPoin,
+    status: 'draft',
+    sigLead: null,
+    finalizedAt: null,
+    createdAt: new Date().toISOString(),
+    _sessions: sessions // dipakai sementara di memori utk render Evaluasi gabungan, tidak disimpan ke DB
+  };
+
+  const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
+  const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
+  const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
+  const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
+  if(checklistBtn) checklistBtn.classList.add('nav-disabled'); // checklist per-item hanya lewat Tinjau Evaluasi
+  if(findingsBtn) findingsBtn.classList.remove('nav-disabled');
+  if(closingBtn) closingBtn.classList.remove('nav-disabled');
+  if(reportBtn) reportBtn.classList.add('nav-disabled'); // aktif setelah Closing diselesaikan
+
+  toast('Rekap dimulai: '+sessions.length+' sesi digabung.');
+  showScreen('findings');
+}
+
 async function deleteSession(id){
   askConfirm('Hapus PERMANEN sesi ini beserta seluruh foto, catatan, dan tanda tangan di dalamnya — termasuk dari server. Data TIDAK BISA dipulihkan lagi setelah ini. Lanjutkan?', async ()=>{
     await dbDelete(id);
@@ -2229,6 +2507,7 @@ function renderChecklist(){
   updateRing();
 }
 function setRating(idx, val){
+  if(currentUser.role==='lead'){ toast('Mode Lead hanya untuk meninjau — checklist tidak bisa diedit.'); return; }
   if(currentUser.role==='auditor' && !isSessionOwnedByMe()){ toast('Anda bukan evaluator penanggung jawab sesi ini — tidak bisa mengedit checklist ini.'); return; }
   state.items[idx].rating = state.items[idx].rating===val? null : val;
   if(state.items[idx].rating && state.items[idx].rating!=='ok'){
@@ -2306,6 +2585,7 @@ function renderThumbs(){
   document.getElementById('modal-thumbs').innerHTML = renderPhotoThumbsHtml(it.photos, it.followUp && it.followUp.photos);
 }
 function saveModal(){
+  if(currentUser.role==='lead'){ toast('Mode Lead hanya untuk meninjau — checklist tidak bisa diedit.'); closeModal(); return; }
   if(currentUser.role==='auditor' && !isSessionOwnedByMe()){ toast('Anda bukan evaluator penanggung jawab sesi ini — tidak bisa mengedit checklist ini.'); closeModal(); return; }
   const it=state.items[activeItemIndex];
   it.note=document.getElementById('modal-note').value;
@@ -2809,7 +3089,48 @@ function latestHistoryLine(followUp){
     <b style="color:var(--teal);font-family:var(--font-mono);font-size:10px;letter-spacing:0.3px;">${typeLabel.toUpperCase()} · ${dt}</b><br>${escapeHtml(last.text)}
   </div>`;
 }
+let leadFindingsSearchTerm='';
+function onLeadFindingsSearch(val){ leadFindingsSearchTerm=val; renderCombinedLeadFindings(); }
+function renderCombinedLeadFindings(){
+  document.getElementById('lead-findings-search').classList.remove('hidden');
+  const sessions = (leadRekapDraft && leadRekapDraft._sessions) || [];
+  let combined=[];
+  sessions.forEach(s=>{
+    s.items.filter(i=>i.rating && i.rating!=='ok').forEach(it=>{
+      combined.push({...it, _sessionNomor:s.nomor||'-', _sessionUnit:s.unit, _sessionEvaluator:s.auditor||'-'});
+    });
+  });
+  document.getElementById('stat-major').textContent = combined.filter(f=>f.rating==='major').length;
+  document.getElementById('stat-minor').textContent = combined.filter(f=>f.rating==='minor').length;
+  document.getElementById('stat-ofi').textContent = combined.filter(f=>f.rating==='ofi').length;
+
+  const term=(leadFindingsSearchTerm||'').trim().toLowerCase();
+  if(term){
+    const tokens=term.split(/\s+/).filter(Boolean);
+    combined = combined.filter(f=>{
+      const haystacks=[f.code, f.text, f.note, f.recommendation, f._sessionNomor, f._sessionUnit, f._sessionEvaluator].map(v=>String(v||'').toLowerCase());
+      return tokens.every(tok=>haystacks.some(h=>h.includes(tok)));
+    });
+  }
+
+  const box=document.getElementById('findings-list');
+  if(!combined.length){ box.innerHTML=`<div class="empty"><p>${term? 'Tidak ada item yang cocok dengan pencarian.' : 'Tidak ada evaluasi Minor/Mayor/OFI pada sesi yang dipilih.'}</p></div>`; return; }
+  const labelMap={minor:'MINOR',major:'MAYOR',ofi:'OFI'};
+  box.innerHTML = combined.map(f=>`
+    <div class="report-item">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="clause-code">${f.code}</span>
+        <span class="sev-tag ${f.rating}">${labelMap[f.rating]}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);font-family:var(--font-mono);margin:2px 0;">${f._sessionNomor} · ${escapeHtml(f._sessionUnit)} · 👤 ${escapeHtml(f._sessionEvaluator)}</div>
+      <div style="font-size:13px;margin:5px 0;">${f.text}</div>
+      ${f.note?`<div style="font-size:12px;color:var(--text-dim);white-space:pre-line;">Evaluasi: ${nl2br(f.note)}</div>`:''}
+      ${f.recommendation?`<div style="font-size:12px;color:var(--teal);margin-top:3px;white-space:pre-line;">→ ${nl2br(f.recommendation)}</div>`:''}
+    </div>`).join('');
+}
 function renderFindings(){
+  if(leadRekapDraft){ renderCombinedLeadFindings(); return; }
+  document.getElementById('lead-findings-search').classList.add('hidden');
   const findingsWithIdx = state.items.map((it,idx)=>({...it, _idx:idx})).filter(i=>i.rating && i.rating!=='ok');
   document.getElementById('stat-major').textContent = findingsWithIdx.filter(f=>f.rating==='major').length;
   document.getElementById('stat-minor').textContent = findingsWithIdx.filter(f=>f.rating==='minor').length;
@@ -2819,7 +3140,7 @@ function renderFindings(){
   const labelMap={minor:'MINOR',major:'MAYOR',ofi:'OFI'};
   const agreed = state.approvalStatus==='approved' || state.approvalStatus==='finalized';
   const preAgreement = currentUser.role==='auditee' && !agreed;
-  const canFollowUp = currentUser.role!=='auditor' || isSessionOwnedByMe();
+  const canFollowUp = currentUser.role==='lead' ? false : (currentUser.role!=='auditor' || isSessionOwnedByMe());
   box.innerHTML = findingsWithIdx.map(f=>{
     const fuStatus=(f.followUp && f.followUp.status==='close')?'close':'open';
     const isOfi = f.rating==='ofi';
@@ -2960,6 +3281,7 @@ function renderClosingLogHtml(){
   </div>`;
 }
 function renderClosing(){
+  if(currentUser.role==='lead'){ renderLeadClosing(); return; }
   const box=document.getElementById('closing-content');
   const titleEl=document.getElementById('closing-title');
   const subEl=document.getElementById('closing-subtitle');
@@ -3152,6 +3474,72 @@ async function finalizeClosing(){
 
 /* ---------- Report ---------- */
 let reportTab='hasil';
+function renderLeadClosing(){
+  const box=document.getElementById('closing-content');
+  const titleEl=document.getElementById('closing-title');
+  const subEl=document.getElementById('closing-subtitle');
+  if(!box) return;
+  if(!leadRekapDraft){
+    titleEl.textContent='Rekap Evaluasi Kepatuhan';
+    subEl.textContent='Belum ada rekap yang sedang berjalan.';
+    box.innerHTML=`<div class="empty"><p>Pilih sesi di Beranda lalu klik "Mulai Rekap Sesi Evaluasi Kepatuhan" terlebih dahulu.</p></div>`;
+    return;
+  }
+  const isHasil = leadRekapDraft.mode==='hasil';
+  titleEl.textContent = isHasil? 'Rekap Hasil Evaluasi Kepatuhan' : 'Rekap Tindak Lanjut Evaluasi Kepatuhan';
+  subEl.textContent = 'Tinjau ringkasan sesi yang direkap, bubuhkan tanda tangan, lalu selesaikan rekap.';
+
+  const rowsHtml = leadRekapDraft.rows.map(r=>`
+    <tr style="border-top:1px solid var(--border-soft);">
+      <td style="padding:8px 10px;font-family:var(--font-mono);">${r.nomor}</td>
+      <td style="padding:8px 10px;">${r.tanggal}</td>
+      <td style="padding:8px 10px;">${escapeHtml(r.unit)}</td>
+      <td style="padding:8px 10px;">${escapeHtml(r.standar)}</td>
+      <td style="padding:8px 10px;">${escapeHtml(r.evaluator)}</td>
+      <td style="padding:8px 10px;"><span class="sev-tag major">${r.open} OPEN</span> <span class="sev-tag ok">${r.close} CLOSE</span></td>
+      ${isHasil? `<td style="padding:8px 10px;">${r.ketaatan}%</td>` : ''}
+    </tr>`).join('');
+
+  box.innerHTML = `
+    <div class="card" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap;">
+        <thead><tr style="text-align:left;color:var(--text-dim);font-family:var(--font-mono);font-size:10.5px;">
+          <th style="padding:8px 10px;">NO. EVALUASI</th><th style="padding:8px 10px;">TANGGAL</th>
+          <th style="padding:8px 10px;">OBJEK EVALUASI</th><th style="padding:8px 10px;">STANDAR</th>
+          <th style="padding:8px 10px;">EVALUATOR</th><th style="padding:8px 10px;">OPEN/CLOSE</th>
+          ${isHasil? '<th style="padding:8px 10px;">% KETAATAN</th>' : ''}
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="sig-label"><b>Tanda Tangan Lead Evaluator</b><span class="icon-btn btn-sm" onclick="clearSig('sig-lead', ()=>{const b=document.getElementById('btn-finalize-lead-rekap'); if(b) b.disabled=true;})">Hapus</span></div>
+      <canvas class="sig-pad" id="sig-lead"></canvas>
+    </div>
+    <button class="btn btn-primary" id="btn-finalize-lead-rekap" disabled onclick="finalizeLeadRekap()">
+      ${isHasil? 'Selesaikan Rekap Hasil Evaluasi Kepatuhan' : 'Selesaikan Rekap Tindak Lanjut Evaluasi Kepatuhan'}
+    </button>
+  `;
+  initSigCanvas('sig-lead', ()=>{ const b=document.getElementById('btn-finalize-lead-rekap'); if(b) b.disabled=false; });
+}
+async function finalizeLeadRekap(){
+  if(!leadRekapDraft) return;
+  const canvas=document.getElementById('sig-lead');
+  const sigDataUrl = canvas? cropSignatureDataUrl(canvas) : null;
+  if(!sigDataUrl){ toast('Bubuhkan tanda tangan terlebih dahulu.'); return; }
+  leadRekapDraft.sigLead = sigDataUrl;
+  leadRekapDraft.status = 'finalized';
+  leadRekapDraft.finalizedAt = new Date().toISOString();
+
+  const { _sessions, ...toSave } = leadRekapDraft;
+  await dbPutLeadRekap(toSave);
+
+  const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
+  if(reportBtn) reportBtn.classList.remove('nav-disabled');
+  leadSelectedSessionIds = new Set();
+  toast('Rekap selesai & tersimpan.');
+  showScreen('report');
+}
 function setReportTab(tab){
   reportTab=tab;
   document.getElementById('tab-report-hasil').classList.toggle('active', tab==='hasil');
@@ -3159,8 +3547,84 @@ function setReportTab(tab){
   renderReport();
 }
 function renderReport(){
+  if(currentUser.role==='lead' && leadRekapDraft){ renderLeadReport(); return; }
+  document.getElementById('tab-report-hasil').textContent='Laporan Hasil Evaluasi Kepatuhan';
+  document.getElementById('tab-report-tindaklanjut').textContent='Laporan Tindak Lanjut Evaluasi Kepatuhan';
   if(reportTab==='tindak_lanjut'){ renderReportTindakLanjut(); return; }
   renderReportHasil();
+}
+function buildLeadRekapTableHtml(showKetaatan){
+  if(!leadRekapDraft) return '';
+  const rowsHtml = leadRekapDraft.rows.map(r=>`
+    <tr style="border-top:1px solid var(--border-soft);">
+      <td style="padding:6px 8px;font-family:var(--font-mono);">${r.nomor}</td>
+      <td style="padding:6px 8px;">${r.tanggal}</td>
+      <td style="padding:6px 8px;">${escapeHtml(r.unit)}</td>
+      <td style="padding:6px 8px;">${escapeHtml(r.standar)}</td>
+      <td style="padding:6px 8px;">${escapeHtml(r.evaluator)}</td>
+      <td style="padding:6px 8px;white-space:nowrap;"><span class="sev-tag major">${r.open} OPEN</span> <span class="sev-tag ok">${r.close} CLOSE</span></td>
+      ${showKetaatan? `<td style="padding:6px 8px;">${r.ketaatan}%</td>` : ''}
+    </tr>`).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:10px;">
+    <thead><tr style="text-align:left;color:var(--text-dim);font-family:var(--font-mono);font-size:9.5px;">
+      <th style="padding:6px 8px;">NO. EVALUASI</th><th style="padding:6px 8px;">TANGGAL</th>
+      <th style="padding:6px 8px;">OBJEK EVALUASI</th><th style="padding:6px 8px;">STANDAR</th>
+      <th style="padding:6px 8px;">EVALUATOR</th><th style="padding:6px 8px;">OPEN/CLOSE</th>
+      ${showKetaatan? '<th style="padding:6px 8px;">% KETAATAN</th>' : ''}
+    </tr></thead><tbody>${rowsHtml}</tbody></table>`;
+}
+function renderLeadReport(){
+  document.getElementById('tab-report-hasil').textContent='Rekap Hasil Evaluasi Kepatuhan';
+  document.getElementById('tab-report-tindaklanjut').textContent='Rekap Tindak Lanjut Evaluasi Kepatuhan';
+  if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){
+    document.getElementById('report-title').textContent='Rekap Evaluasi Kepatuhan';
+    document.getElementById('report-subtitle').textContent='Selesaikan proses Closing terlebih dahulu untuk menerbitkan laporan rekap.';
+    document.getElementById('report-preview').innerHTML = `<div class="empty"><p>Belum ada rekap yang selesai/final.</p></div>`;
+    return;
+  }
+  document.getElementById('report-subtitle').textContent='Laporan siap diekspor.';
+  if(reportTab==='tindak_lanjut') renderLeadReportTindakLanjut();
+  else renderLeadReportHasil();
+}
+function renderLeadReportHasil(){
+  document.getElementById('report-title').textContent='Rekap Hasil Evaluasi Kepatuhan';
+  const r=leadRekapDraft;
+  document.getElementById('report-preview').innerHTML = `
+    <div style="font-family:var(--font-display);font-weight:700;font-size:17px;margin-bottom:12px;">Rekap Hasil Evaluasi Kepatuhan</div>
+    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;">
+      Objek Evaluasi Kepatuhan: <b style="color:var(--text);">${escapeHtml(r.objekEvaluasi)}</b><br>
+      Lead Evaluator: <b style="color:var(--text);">${escapeHtml(r.leadEvaluator)}</b><br>
+      Pemilik Proses: <b style="color:var(--text);">${escapeHtml(r.auditeeName||'-')}</b><br>
+      Tanggal Pelaksanaan: <b style="color:var(--text);">${r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'long'}) : '-'}</b><br>
+      Total poin diperiksa: <b style="color:var(--text);">${r.totalPoin}</b><br>
+      Status: <b style="color:var(--teal);">Disetujui Evaluator &amp; Pemilik</b>
+    </div>
+    ${buildLeadRekapTableHtml(true)}
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Tanda Tangan Lead Evaluator</div>
+      ${r.sigLead? `<img src="${r.sigLead}" style="max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
+    </div>
+  `;
+}
+function renderLeadReportTindakLanjut(){
+  document.getElementById('report-title').textContent='Rekap Tindak Lanjut Evaluasi Kepatuhan';
+  const r=leadRekapDraft;
+  document.getElementById('report-preview').innerHTML = `
+    <div style="font-family:var(--font-display);font-weight:700;font-size:17px;margin-bottom:12px;">Rekap Tindak Lanjut Evaluasi Kepatuhan</div>
+    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;">
+      Objek Evaluasi Kepatuhan: <b style="color:var(--text);">${escapeHtml(r.objekEvaluasi)}</b><br>
+      Lead Evaluator: <b style="color:var(--text);">${escapeHtml(r.leadEvaluator)}</b><br>
+      Pemilik Proses: <b style="color:var(--text);">${escapeHtml(r.auditeeName||'-')}</b><br>
+      Tanggal Penyelesaian: <b style="color:var(--text);">${r.createdAt? new Date(r.createdAt).toLocaleDateString('id-ID',{dateStyle:'long'}) : '-'}</b><br>
+      Total poin diperiksa: <b style="color:var(--text);">${r.totalPoin}</b><br>
+      Status: <b style="color:var(--text);">Sesi evaluasi Kepatuhan ditutup</b>
+    </div>
+    ${buildLeadRekapTableHtml(false)}
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Tanda Tangan Lead Evaluator</div>
+      ${r.sigLead? `<img src="${r.sigLead}" style="max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
+    </div>
+  `;
 }
 function renderFindingsCardsHtml(findings, showStatus){
   const labelMap={minor:'MINOR',major:'MAYOR',ofi:'OFI'};
@@ -3245,6 +3709,24 @@ function renderReportTindakLanjut(){
   `;
 }
 document.getElementById('btn-export-csv').addEventListener('click', ()=>{
+  if(currentUser.role==='lead' && leadRekapDraft){
+    if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
+    const isHasil = reportTab!=='tindak_lanjut';
+    const head = isHasil
+      ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close','% Ketaatan']
+      : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close'];
+    const body = leadRekapDraft.rows.map(r=> isHasil
+      ? [r.nomor, r.tanggal, r.unit, r.standar, r.evaluator, r.open, r.close, r.ketaatan+'%']
+      : [r.nomor, r.tanggal, r.unit, r.standar, r.evaluator, r.open, r.close]);
+    const csv=[head,...body].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`ComplyShield_RekapLead_${(leadRekapDraft.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.csv`;
+    a.click();
+    toast('CSV rekap diunduh');
+    return;
+  }
   if(reportTab==='tindak_lanjut'){
     if(!state.followUpReport){ toast('Laporan Tindak Lanjut Evaluasi Kepatuhan belum terbit'); return; }
     const rows=[['Klausul','Item','Rating','Evaluasi','Rekomendasi','Tindak Lanjut Terkini','Status']];
@@ -3274,9 +3756,52 @@ document.getElementById('btn-export-csv').addEventListener('click', ()=>{
 });
 document.getElementById('btn-export-pdf').addEventListener('click', async ()=>{
   if(!window.jspdf){ toast('Pustaka PDF belum siap, coba lagi sesaat'); return; }
+  if(currentUser.role==='lead' && leadRekapDraft){ await exportLeadRekapPdf(); return; }
   if(reportTab==='tindak_lanjut'){ await exportTindakLanjutPdf(); return; }
   await exportHasilAuditPdf();
 });
+async function exportLeadRekapPdf(){
+  if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
+  const isHasil = reportTab!=='tindak_lanjut';
+  const r=leadRekapDraft;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  drawPdfLogoHeader(doc);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text(isHasil? 'REKAP HASIL EVALUASI KEPATUHAN' : 'REKAP TINDAK LANJUT EVALUASI KEPATUHAN', 15, 23);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  let y=31;
+  doc.text(`Objek Evaluasi Kepatuhan: ${r.objekEvaluasi}`, 15, y); y+=6;
+  doc.text(`Lead Evaluator: ${r.leadEvaluator}`, 15, y); y+=6;
+  doc.text(`Pemilik Proses: ${r.auditeeName||'-'}`, 15, y); y+=6;
+  if(isHasil){
+    doc.text(`Tanggal Pelaksanaan: ${r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'long'}) : '-'}`, 15, y); y+=6;
+  } else {
+    doc.text(`Tanggal Penyelesaian: ${r.createdAt? new Date(r.createdAt).toLocaleDateString('id-ID',{dateStyle:'long'}) : '-'}`, 15, y); y+=6;
+  }
+  doc.text(`Total poin diperiksa: ${r.totalPoin}`, 15, y); y+=6;
+  doc.text(`Status: ${isHasil? 'Disetujui Evaluator & Pemilik' : 'Sesi evaluasi Kepatuhan ditutup'}`, 15, y); y+=8;
+
+  const head = isHasil
+    ? [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Open/Close','% Ketaatan']]
+    : [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Open/Close']];
+  const body = r.rows.map(row=> isHasil
+    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open} OPEN / ${row.close} CLOSE`, row.ketaatan+'%']
+    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open} OPEN / ${row.close} CLOSE`]);
+  if(typeof doc.autoTable==='function'){
+    doc.autoTable({ head, body, startY:y, styles:{fontSize:8, cellPadding:2}, headStyles:{fillColor:[28,36,42], textColor:255} });
+    y = doc.lastAutoTable.finalY + 12;
+  } else {
+    doc.setFontSize(7);
+    body.forEach(row=>{ doc.text(row.join(' | '),15,y); y+=5; });
+    y+=8;
+  }
+  if(y>250){ doc.addPage(); y=20; }
+  doc.setFont('helvetica','bold'); doc.text('Tanda Tangan Lead Evaluator', 15, y); y+=3;
+  await addSignatureToPdf(doc, r.sigLead, 15, y, 55, 25);
+  doc.save(`ComplyShield_RekapLead_${(r.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.pdf`);
+  toast('PDF rekap diunduh');
+}
 function getImageDimensions(dataUrl){
   return new Promise((resolve)=>{
     if(!dataUrl){ resolve(null); return; }
@@ -3694,7 +4219,7 @@ function renderUsersManage(){
   const box=document.getElementById('users-manage-list');
   if(!box) return;
   if(!USERS.length){ box.innerHTML='<div class="empty"><p>Belum ada akun.</p></div>'; return; }
-  const roleLabel={admin:'Admin',auditor:'Evaluator',auditee:'Pemilik Proses'};
+  const roleLabel={admin:'Admin',auditor:'Evaluator',lead:'Lead',auditee:'Pemilik Proses'};
   box.innerHTML = USERS.map(u=>{
     const open=openUserKeys.has(u.username);
     return `<div class="card std-card ${open?'open':''}">
@@ -3717,7 +4242,7 @@ function renderUsersManage(){
         <input class="inline-edit-input" value="${escapeAttr(u.jabatan||'')}" onchange="updateUserField('${u.username}','jabatan',this.value)">
         <label class="inline-edit-label">MODE LOGIN</label>
         <div class="chip-select" style="margin-bottom:14px;">
-          ${['admin','auditor','auditee'].map(r=>`<div class="chip-opt ${u.role===r?'active':''}" onclick="updateUserField('${u.username}','role','${r}')">${roleLabel[r]}</div>`).join('')}
+          ${['admin','auditor','lead','auditee'].map(r=>`<div class="chip-opt ${u.role===r?'active':''}" onclick="updateUserField('${u.username}','role','${r}')">${roleLabel[r]}</div>`).join('')}
         </div>
         <button class="btn btn-danger btn-sm" style="width:100%;" onclick="removeUser('${u.username}')">Hapus Akun</button>
       </div>
