@@ -2005,6 +2005,7 @@ function applyRolePermissions(){
     [checklistBtn,findingsBtn,closingBtn,reportBtn].forEach(b=>{ if(b) b.classList.add('nav-disabled'); });
     const inpLead=document.getElementById('lead-inp-nama');
     if(inpLead) inpLead.value = currentUser.fullName;
+    resumeLeadDraftIfAny();
   }
   const roleLabel={admin:'Admin',auditor:'Evaluator',lead:'Lead',auditee:'Pemilik Proses'};
   const accEl=document.getElementById('account-info');
@@ -2361,6 +2362,28 @@ async function reviewSessionAsLead(id){
 }
 // Mulai proses rekap gabungan dari sesi-sesi yang sudah dipilih
 let leadRekapDraft=null;
+// Kalau halaman sempat reload (umum di HP saat tab lama tidak aktif) sementara rekap belum
+// diselesaikan, draft-nya sudah tersimpan di IndexedDB (lihat startLeadRekap) — fungsi ini
+// memulihkannya kembali ke memori supaya Lead tidak perlu mengulang dari awal.
+async function resumeLeadDraftIfAny(){
+  if(!currentUser || currentUser.role!=='lead' || leadRekapDraft) return;
+  const allDrafts = await dbGetAllLeadRekap();
+  const draft = allDrafts.find(r=>r.status==='draft' && r.leadEvaluatorUsername===currentUser.username);
+  if(!draft) return;
+  const allSessions = await dbGetAll();
+  const matched = allSessions.filter(s=>(draft.sessionIds||[]).includes(s.id));
+  if(!matched.length) return;
+  leadRekapDraft = {...draft, _sessions: matched};
+  const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
+  const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
+  const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
+  const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
+  if(checklistBtn) checklistBtn.classList.add('nav-disabled');
+  if(findingsBtn) findingsBtn.classList.remove('nav-disabled');
+  if(closingBtn) closingBtn.classList.remove('nav-disabled');
+  if(reportBtn) reportBtn.classList.add('nav-disabled');
+  toast('Rekap yang belum selesai berhasil dipulihkan.');
+}
 async function startLeadRekap(){
   if(!leadSelectedSessionIds.size){ toast('Pilih dulu minimal satu sesi berstatus Disetujui atau Selesai.'); return; }
   const objek=document.getElementById('lead-inp-objek').value.trim();
@@ -2404,6 +2427,8 @@ async function startLeadRekap(){
     createdAt: new Date().toISOString(),
     _sessions: sessions // dipakai sementara di memori utk render Evaluasi gabungan, tidak disimpan ke DB
   };
+  // Simpan draft-nya SEKARANG (bukan cuma di memori) supaya tidak hilang kalau halaman sempat reload.
+  { const { _sessions:_omit, ...toSaveDraft } = leadRekapDraft; await dbPutLeadRekap(toSaveDraft); }
 
   const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
   const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
