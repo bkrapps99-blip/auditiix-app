@@ -542,7 +542,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
     <div class="eyebrow">Laporan</div>
     <h1 class="page-title" id="report-title">Laporan Hasil Evaluasi Kepatuhan</h1>
     <p class="page-sub" id="report-subtitle">Laporan siap diekspor. Foto dan tanda tangan disematkan otomatis.</p>
-    <div class="chip-select" style="margin-bottom:16px;">
+    <div class="chip-select" id="report-tab-select" style="margin-bottom:16px;">
       <div class="chip-opt active" id="tab-report-hasil" onclick="setReportTab('hasil')">Laporan Hasil Evaluasi Kepatuhan</div>
       <div class="chip-opt" id="tab-report-tindaklanjut" onclick="setReportTab('tindak_lanjut')">Laporan Tindak Lanjut Evaluasi Kepatuhan</div>
     </div>
@@ -3573,6 +3573,7 @@ function setReportTab(tab){
 }
 function renderReport(){
   if(currentUser.role==='lead' && leadRekapDraft){ renderLeadReport(); return; }
+  document.getElementById('report-tab-select').classList.remove('hidden');
   document.getElementById('tab-report-hasil').textContent='Laporan Hasil Evaluasi Kepatuhan';
   document.getElementById('tab-report-tindaklanjut').textContent='Laporan Tindak Lanjut Evaluasi Kepatuhan';
   if(reportTab==='tindak_lanjut'){ renderReportTindakLanjut(); return; }
@@ -3599,8 +3600,7 @@ function buildLeadRekapTableHtml(showKetaatan){
     </tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 function renderLeadReport(){
-  document.getElementById('tab-report-hasil').textContent='Rekap Hasil Evaluasi Kepatuhan';
-  document.getElementById('tab-report-tindaklanjut').textContent='Rekap Tindak Lanjut Evaluasi Kepatuhan';
+  document.getElementById('report-tab-select').classList.add('hidden');
   if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){
     document.getElementById('report-title').textContent='Rekap Evaluasi Kepatuhan';
     document.getElementById('report-subtitle').textContent='Selesaikan proses Closing terlebih dahulu untuk menerbitkan laporan rekap.';
@@ -3608,7 +3608,7 @@ function renderLeadReport(){
     return;
   }
   document.getElementById('report-subtitle').textContent='Laporan siap diekspor.';
-  if(reportTab==='tindak_lanjut') renderLeadReportTindakLanjut();
+  if(leadRekapDraft.mode==='tindak_lanjut') renderLeadReportTindakLanjut();
   else renderLeadReportHasil();
 }
 function renderLeadReportHasil(){
@@ -3692,12 +3692,12 @@ function renderReportHasil(){
     <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:0.3px;max-width:75%;">LAPORAN HASIL EVALUASI KEPATUHAN${state.nomor?' · No. '+state.nomor:''}</div>
     <div style="font-family:var(--font-display);font-weight:700;font-size:17px;margin:6px 0 12px;max-width:75%;">${state.unit}</div>
     <div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;">
-      Standar: ${lib?lib.name:'-'}<br>
-      Evaluator: ${state.auditor || '-'}<br>
-      Pemilik Proses: ${auditeeDisplayName(state)}<br>
-      Tanggal Pelaksanaan: ${new Date(tglPelaksanaan).toLocaleDateString('id-ID',{dateStyle:'long'})}<br>
-      Total poin diperiksa: ${state.items.filter(i=>i.rating).length}/${state.items.length}<br>
-      Status: ${(state.approvalStatus==='approved'||state.approvalStatus==='finalized')?'Disetujui Evaluator & Pemilik Proses':'Sedang berjalan — belum disetujui'}
+      Standar: <b style="color:var(--text);">${lib?lib.name:'-'}</b><br>
+      Evaluator: <b style="color:var(--text);">${escapeHtml(state.auditor || '-')}</b><br>
+      Pemilik Proses: <b style="color:var(--text);">${escapeHtml(auditeeDisplayName(state))}</b><br>
+      Tanggal Pelaksanaan: <b style="color:var(--text);">${new Date(tglPelaksanaan).toLocaleDateString('id-ID',{dateStyle:'long'})}</b><br>
+      Total poin diperiksa: <b style="color:var(--text);">${state.items.filter(i=>i.rating).length}/${state.items.length}</b><br>
+      Status: <b style="color:var(--teal);">${(state.approvalStatus==='approved'||state.approvalStatus==='finalized')?'Disetujui Evaluator & Pemilik Proses':'Sedang berjalan — belum disetujui'}</b>
     </div>
     <div class="divider"></div>
     ${renderFindingsCardsHtml(findings, false)}
@@ -3721,12 +3721,12 @@ function renderReportTindakLanjut(){
     <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:0.3px;">LAPORAN TINDAK LANJUT EVALUASI KEPATUHAN${state.nomor?' · No. '+state.nomor:''}</div>
     <div style="font-family:var(--font-display);font-weight:700;font-size:17px;margin:6px 0 12px;">${state.unit}</div>
     <div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;">
-      Standar: ${lib?lib.name:'-'}<br>
-      Evaluator: ${state.auditor || '-'}<br>
-      Pemilik Proses: ${auditeeDisplayName(state)}<br>
-      Tanggal Penyelesaian: ${rep.completionDate? new Date(rep.completionDate).toLocaleDateString('id-ID',{dateStyle:'long'}):'-'}<br>
-      Total poin diperiksa: ${state.items.filter(i=>i.rating).length}/${state.items.length}<br>
-      Status: Sesi evaluasi kepatuhan ditutup
+      Standar: <b style="color:var(--text);">${lib?lib.name:'-'}</b><br>
+      Evaluator: <b style="color:var(--text);">${escapeHtml(state.auditor || '-')}</b><br>
+      Pemilik Proses: <b style="color:var(--text);">${escapeHtml(auditeeDisplayName(state))}</b><br>
+      Tanggal Penyelesaian: <b style="color:var(--text);">${rep.completionDate? new Date(rep.completionDate).toLocaleDateString('id-ID',{dateStyle:'long'}):'-'}</b><br>
+      Total poin diperiksa: <b style="color:var(--text);">${state.items.filter(i=>i.rating).length}/${state.items.length}</b><br>
+      Status: <b style="color:var(--text);">Sesi evaluasi kepatuhan ditutup</b>
     </div>
     <div class="divider"></div>
     ${renderFindingsCardsHtml(findings, true)}
@@ -3736,7 +3736,7 @@ function renderReportTindakLanjut(){
 document.getElementById('btn-export-csv').addEventListener('click', ()=>{
   if(currentUser.role==='lead' && leadRekapDraft){
     if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
-    const isHasil = reportTab!=='tindak_lanjut';
+    const isHasil = leadRekapDraft.mode!=='tindak_lanjut';
     const head = isHasil
       ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close','% Ketaatan']
       : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close'];
@@ -3787,7 +3787,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async ()=>{
 });
 async function exportLeadRekapPdf(){
   if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
-  const isHasil = reportTab!=='tindak_lanjut';
+  const isHasil = leadRekapDraft.mode!=='tindak_lanjut';
   const r=leadRekapDraft;
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
