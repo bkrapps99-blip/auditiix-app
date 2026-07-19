@@ -280,6 +280,15 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
 .photo-lightbox img{max-width:100%;max-height:100%;border-radius:6px;object-fit:contain;}
 .photo-lightbox-close{position:fixed;top:18px;right:22px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.12);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer;border:1px solid rgba(255,255,255,0.25);}
 .photo-lightbox-close:hover{background:rgba(255,255,255,0.22);}
+.file-viewer{position:fixed;inset:0;background:#20262b;z-index:9999;display:flex;flex-direction:column;}
+.file-viewer.hidden{display:none;}
+.file-viewer-toolbar{flex-shrink:0;height:52px;background:#151a1e;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;color:#EAEFF1;font-size:13px;font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.08);}
+.file-viewer-btn{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.18);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.file-viewer-btn:hover{background:rgba(255,255,255,0.16);}
+.file-viewer-body{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;}
+.file-viewer-body iframe{width:100%;height:100%;border:none;background:#fff;border-radius:4px;}
+.file-viewer-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
+.file-viewer-body .file-viewer-fallback{color:#cbd3d8;text-align:center;max-width:360px;font-size:13.5px;line-height:1.7;}
 
 /* signature */
 .sig-pad{background:#fff;border-radius:var(--radius);width:100%;touch-action:none;height:150px;}
@@ -856,6 +865,17 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
   <div class="photo-lightbox hidden" id="photo-lightbox" onclick="closePhotoLightbox()">
     <div class="photo-lightbox-close" onclick="closePhotoLightbox()">&times;</div>
     <img id="photo-lightbox-img" src="" onclick="event.stopPropagation()">
+  </div>
+
+  <div class="file-viewer hidden" id="file-viewer">
+    <div class="file-viewer-toolbar">
+      <span id="file-viewer-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button class="file-viewer-btn" onclick="downloadCurrentViewerFile()" title="Unduh">⬇</button>
+        <button class="file-viewer-btn" onclick="closeFileViewer()" title="Tutup">&times;</button>
+      </div>
+    </div>
+    <div class="file-viewer-body" id="file-viewer-body"></div>
   </div>
 
   <div class="bottomnav">
@@ -2661,6 +2681,54 @@ function closePhotoLightbox(){
   document.getElementById('photo-lightbox').classList.add('hidden');
   document.getElementById('photo-lightbox-img').src='';
 }
+
+/* ---------- Penampil berkas (dokumen unggahan & ekspor PDF tampil langsung, bukan unduh) ---------- */
+let currentViewerFile=null; // {dataUrl, fileName}
+// Data base64 file bisa besar — disimpan di cache ini (bukan ditulis langsung ke atribut onclick)
+// supaya HTML tidak membengkak & aman dari karakter aneh dalam data.
+let _viewerFileCache={};
+let _viewerFileCacheSeq=0;
+function cacheViewerFile(fileName, dataUrl){
+  const key='vf'+(_viewerFileCacheSeq++);
+  _viewerFileCache[key]={fileName, dataUrl};
+  return key;
+}
+function openFileViewerByKey(key){
+  const f=_viewerFileCache[key];
+  if(!f) return;
+  openFileViewer(f.dataUrl, f.fileName);
+}
+function openFileViewer(dataUrl, fileName){
+  currentViewerFile={dataUrl, fileName};
+  document.getElementById('file-viewer-name').textContent=fileName;
+  const body=document.getElementById('file-viewer-body');
+  const ext=(fileName.split('.').pop()||'').toLowerCase();
+  const isImage=/^(jpe?g|png|gif|webp|bmp)$/.test(ext) || dataUrl.startsWith('data:image');
+  const isPdf = ext==='pdf' || dataUrl.startsWith('data:application/pdf');
+  if(isImage){
+    body.innerHTML=`<img src="${dataUrl}">`;
+  } else if(isPdf){
+    body.innerHTML=`<iframe src="${dataUrl}"></iframe>`;
+  } else {
+    body.innerHTML=`<div class="file-viewer-fallback">Pratinjau tidak didukung untuk jenis berkas ini (.${escapeHtml(ext||'?')}).<br><br>Gunakan tombol ⬇ di pojok kanan atas untuk mengunduh &amp; membukanya lewat aplikasi lain.</div>`;
+  }
+  document.getElementById('file-viewer').classList.remove('hidden');
+}
+function closeFileViewer(){
+  document.getElementById('file-viewer').classList.add('hidden');
+  document.getElementById('file-viewer-body').innerHTML='';
+  currentViewerFile=null;
+}
+function downloadCurrentViewerFile(){
+  if(!currentViewerFile) return;
+  const a=document.createElement('a');
+  a.href=currentViewerFile.dataUrl;
+  a.download=currentViewerFile.fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 // Gabungkan foto Evaluator & Pemilik Proses jadi satu baris thumbnail, masing-masing diberi
 // tanda (E) untuk Evaluator dan (P) untuk Pemilik Proses.
 function renderPhotoThumbsHtml(evalPhotos, auditeePhotos){
@@ -4080,8 +4148,8 @@ async function exportLeadRekapPdf(rekapRecord){
     await drawSessionReportPageIntoPdf(doc, s);
   }
 
-  doc.save(`ComplyShield_RekapLead_${(r.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.pdf`);
-  toast('PDF rekap diunduh');
+  openFileViewer(doc.output('datauristring'), `ComplyShield_RekapLead_${(r.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.pdf`);
+  toast('PDF siap ditinjau — klik ⬇ di pojok kanan atas untuk mengunduh.');
 }
 function getImageDimensions(dataUrl){
   return new Promise((resolve)=>{
@@ -4173,8 +4241,8 @@ async function exportHasilAuditPdf(){
     doc.text(`Evaluator: ${state.auditor||'-'}`,15,y);
     doc.text(`Pemilik Proses: ${auditeeDisplayName(state)}`,110,y);
   }
-  doc.save(`ComplyShield_LHA_${(state.nomor||state.unit).replace(/[\/\s]+/g,'_')}.pdf`);
-  toast('PDF diunduh');
+  openFileViewer(doc.output('datauristring'), `ComplyShield_LHA_${(state.nomor||state.unit).replace(/[\/\s]+/g,'_')}.pdf`);
+  toast('PDF siap ditinjau — klik ⬇ di pojok kanan atas untuk mengunduh.');
 }
 async function exportTindakLanjutPdf(){
   if(!state.followUpReport){ toast('Laporan Tindak Lanjut Evaluasi Kepatuhan belum terbit'); return; }
@@ -4205,8 +4273,8 @@ async function exportTindakLanjutPdf(){
     doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.text(`Evaluator: ${state.auditor||'-'}`,15,y);
   }
-  doc.save(`ComplyShield_LTA_${(state.nomor||state.unit).replace(/[\/\s]+/g,'_')}.pdf`);
-  toast('PDF Laporan Tindak Lanjut diunduh');
+  openFileViewer(doc.output('datauristring'), `ComplyShield_LTA_${(state.nomor||state.unit).replace(/[\/\s]+/g,'_')}.pdf`);
+  toast('PDF siap ditinjau — klik ⬇ di pojok kanan atas untuk mengunduh.');
 }
 
 /* ---------- Confirm dialog (custom, avoids native confirm() sandbox issues) ---------- */
@@ -4289,7 +4357,8 @@ function nl2br(str){
 // bukan sekadar teks nama file.
 function renderEvidenceLink(fileName, fileData){
   if(!fileName || !fileData) return '';
-  return `<a href="${fileData}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;cursor:pointer;">📎 ${escapeHtml(fileName)}</a>`;
+  const key=cacheViewerFile(fileName, fileData);
+  return `<a href="javascript:void(0)" onclick="openFileViewerByKey('${key}')" style="color:var(--teal);text-decoration:underline;cursor:pointer;">📎 ${escapeHtml(fileName)}</a>`;
 }
 // Tautan eviden yang sudah tersimpan, ditampilkan di ATAS kolom input sebagai link yang bisa diklik.
 function renderSavedLink(url){
@@ -4698,8 +4767,8 @@ function exportRekapPdf(){
     doc.setFontSize(8);
     body.forEach(r=>{ doc.text(r.join(' | '),14,y); y+=5; if(y>190){ doc.addPage(); y=15; } });
   }
-  doc.save(`ComplyShield_Rekap_${new Date().toISOString().slice(0,10)}.pdf`);
-  toast('PDF rekap diunduh');
+  openFileViewer(doc.output('datauristring'), `ComplyShield_Rekap_${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF siap ditinjau — klik ⬇ di pojok kanan atas untuk mengunduh.');
 }
 
 /* ---------- Daftar Evaluasi (Admin) ---------- */
@@ -4816,8 +4885,8 @@ function exportFindingsPdf(){
     let y=30; doc.setFontSize(7);
     body.forEach(r=>{ doc.text(r.join(' | '),14,y); y+=5; if(y>190){ doc.addPage(); y=15; } });
   }
-  doc.save(`ComplyShield_DaftarEvaluasi_${new Date().toISOString().slice(0,10)}.pdf`);
-  toast('PDF daftar evaluasi diunduh');
+  openFileViewer(doc.output('datauristring'), `ComplyShield_DaftarEvaluasi_${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF siap ditinjau — klik ⬇ di pojok kanan atas untuk mengunduh.');
 }
 
 /* ---------- init ---------- */
