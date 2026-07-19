@@ -2567,6 +2567,18 @@ function openDetail(idx){
   document.getElementById('modal-evidence-link-saved').innerHTML = renderSavedLink(it.evidenceLink);
   document.getElementById('modal-evidence-link').value='';
   document.getElementById('modal-evidence-filename').innerHTML = renderEvidenceLink(it.evidenceFileName, it.evidenceFileData);
+
+  const isLeadReadOnly = currentUser.role==='lead';
+  ['modal-note','modal-rec-edit','modal-duedate','modal-evidence-link'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=isLeadReadOnly; el.style.opacity = isLeadReadOnly? 0.7 : 1; }
+  });
+  // Sembunyikan semua tombol aksi (rekam suara, AI, ambil foto, unggah dokumen) dan tombol Simpan
+  document.querySelectorAll('#modal-detail .icon-btn, #modal-detail .manage-link').forEach(btn=>{
+    btn.classList.toggle('hidden', isLeadReadOnly);
+  });
+  document.getElementById('btn-save-modal').classList.toggle('hidden', isLeadReadOnly);
+
   document.getElementById('modal-detail').classList.remove('hidden');
   checkModalSaveEnabled();
 }
