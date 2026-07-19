@@ -386,7 +386,6 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
         <div class="chip-opt" data-val="auditor">Evaluator</div>
         <div class="chip-opt" data-val="lead">Lead</div>
         <div class="chip-opt" data-val="auditee">Pemilik Proses</div>
-        <div class="chip-opt" data-val="admin">Admin</div>
       </div>
     </div>
     <div class="field" style="position:relative;">
@@ -1860,13 +1859,16 @@ async function attemptLogin(){
     const username=document.getElementById('login-username').value.trim();
     const password=document.getElementById('login-password').value;
     if(!storageOk){ showLoginError('Penyimpanan lokal bermasalah — lihat pesan merah di atas. Aplikasi belum bisa dipakai sampai ini teratasi.'); return; }
-    if(!loginRole){ showLoginError('Pilih mode login (Admin/Evaluator/Lead/Pemilik Proses) terlebih dahulu.'); return; }
     if(!username || !password){ showLoginError('Isi username dan kata sandi.'); return; }
     if(!USERS.length){ await loadUsers(); }
     const u=findUser(username);
     if(!u){ showLoginError(`Username "${username}" tidak ditemukan.`); return; }
     if(u.password!==password){ showLoginError('Kata sandi salah untuk username tersebut.'); return; }
-    if(u.role!==loginRole){ showLoginError(`Akun "${username}" terdaftar sebagai ${u.role}, bukan ${loginRole}. Pilih mode login yang sesuai.`); return; }
+    // Akun Admin bisa langsung masuk cukup dengan username & password, tanpa perlu pilih Mode Login.
+    if(u.role!=='admin'){
+      if(!loginRole){ showLoginError('Pilih mode login (Evaluator/Lead/Pemilik Proses) terlebih dahulu.'); return; }
+      if(u.role!==loginRole){ showLoginError(`Akun "${username}" terdaftar sebagai ${u.role}, bukan ${loginRole}. Pilih mode login yang sesuai.`); return; }
+    }
     currentUser=u;
     MASTER.loggedInUser=username;
     if(!MASTER.loginHistory) MASTER.loginHistory=[];
