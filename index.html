@@ -2721,6 +2721,11 @@ function closeFileViewer(){
   document.getElementById('file-viewer-body').innerHTML='';
   currentViewerFile=null;
 }
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && !document.getElementById('file-viewer').classList.contains('hidden')){
+    closeFileViewer();
+  }
+});
 function downloadCurrentViewerFile(){
   if(!currentViewerFile) return;
   const a=document.createElement('a');
