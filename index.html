@@ -548,6 +548,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
       <div class="chip-opt active" id="tab-report-hasil" onclick="setReportTab('hasil')">Laporan Hasil Evaluasi Kepatuhan</div>
       <div class="chip-opt" id="tab-report-tindaklanjut" onclick="setReportTab('tindak_lanjut')">Laporan Tindak Lanjut Evaluasi Kepatuhan</div>
     </div>
+    <input class="input hidden" id="lead-rekap-history-search" oninput="onLeadRekapHistorySearch(this.value)" placeholder="Cari objek evaluasi, evaluator, Pemilik Proses, bulan, dsb..." style="margin-bottom:14px;">
     <div class="card" id="report-preview" style="position:relative;"></div>
     <div class="btn-row" style="margin-top:4px;">
       <button class="btn btn-primary" id="btn-export-pdf">Ekspor PDF</button>
@@ -2083,8 +2084,25 @@ function showScreen(name){
     updateAiProviderLabels();
     refreshSyncPanel();
   }
-  if(name==='home') refreshSavedSessions();
+  if(name==='home'){ resetLeadFormIfFinalized(); refreshSavedSessions(); }
   if(currentUser) markNotifRead(name);
+}
+function resetLeadFormIfFinalized(){
+  if(!currentUser || currentUser.role!=='lead') return;
+  if(leadRekapDraft && leadRekapDraft.status==='finalized'){
+    leadRekapDraft = null;
+    leadSelectedSessionIds = new Set();
+    const objekEl=document.getElementById('lead-inp-objek');
+    const auditeeEl=document.getElementById('lead-auditee-select');
+    if(objekEl) objekEl.value='';
+    if(auditeeEl) auditeeEl.value='';
+    const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
+    const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
+    const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
+    [checklistBtn,findingsBtn,closingBtn].forEach(b=>{ if(b) b.classList.add('nav-disabled'); });
+    renderLeadDraftBanner();
+    updateLeadRekapInfo();
+  }
 }
 // Re-render data untuk layar yang SEDANG DIBUKA — dipanggil setelah sinkronisasi selesai,
 // supaya layar seperti Rekap/Daftar Temuan tidak "nyangkut" menampilkan data lama/kosong
@@ -2098,7 +2116,7 @@ function refreshVisibleScreenData(){
   if(name==='admin-findings') renderAdminFindings();
   if(name==='standards') renderStandardsManage();
   if(name==='access') renderUsersManage();
-  if(name==='home') refreshSavedSessions();
+  if(name==='home'){ resetLeadFormIfFinalized(); refreshSavedSessions(); }
 }
 document.querySelectorAll('.navbtn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3564,6 +3582,12 @@ function renderLeadClosing(){
     box.innerHTML=`<div class="empty"><p>Pilih sesi di Beranda lalu klik "Mulai Rekap Sesi Evaluasi Kepatuhan" terlebih dahulu.</p></div>`;
     return;
   }
+  if(leadRekapDraft.status==='finalized'){
+    titleEl.textContent = leadRekapDraft.mode==='hasil'? 'Rekap Hasil Evaluasi Kepatuhan' : 'Rekap Tindak Lanjut Evaluasi Kepatuhan';
+    subEl.textContent='Rekap ini sudah diterbitkan.';
+    box.innerHTML = `<div class="empty"><p>✅ Rekap sudah diterbitkan pada ${leadRekapDraft.finalizedAt? new Date(leadRekapDraft.finalizedAt).toLocaleString('id-ID',{dateStyle:'long',timeStyle:'short'}) : '-'}. Buka menu <b>Laporan</b> untuk melihat/mengekspornya.</p></div>`;
+    return;
+  }
   const isHasil = leadRekapDraft.mode==='hasil';
   titleEl.textContent = isHasil? 'Rekap Hasil Evaluasi Kepatuhan' : 'Rekap Tindak Lanjut Evaluasi Kepatuhan';
   subEl.textContent = 'Tinjau ringkasan sesi yang direkap, bubuhkan tanda tangan, lalu selesaikan rekap.';
@@ -3629,6 +3653,7 @@ function setReportTab(tab){
 function renderReport(){
   if(currentUser.role==='lead'){ renderLeadReport(); return; }
   document.getElementById('report-tab-select').classList.remove('hidden');
+  document.getElementById('lead-rekap-history-search').classList.add('hidden');
   document.getElementById('btn-export-pdf').classList.remove('hidden');
   document.getElementById('btn-export-csv').classList.remove('hidden');
   document.getElementById('btn-export-csv').textContent='Ekspor Excel (CSV)';
@@ -3665,27 +3690,50 @@ function renderLeadReport(){
   }
   document.getElementById('btn-export-pdf').classList.remove('hidden');
   document.getElementById('btn-export-csv').classList.remove('hidden');
+  document.getElementById('lead-rekap-history-search').classList.add('hidden');
   document.getElementById('report-subtitle').textContent='Laporan siap diekspor.';
   document.getElementById('btn-export-csv').textContent='Ekspor Excel (XLSX)';
   if(leadRekapDraft.mode==='tindak_lanjut') renderLeadReportTindakLanjut();
   else renderLeadReportHasil();
 }
 let leadRekapHistoryCache=[];
+let leadRekapHistorySearchTerm='';
+function onLeadRekapHistorySearch(val){ leadRekapHistorySearchTerm=val; renderLeadRekapHistoryList(); }
 async function renderLeadRekapHistory(){
   document.getElementById('report-title').textContent='Riwayat Rekap Evaluasi Kepatuhan';
   document.getElementById('report-subtitle').textContent='Semua rekap yang pernah Anda selesaikan.';
   document.getElementById('btn-export-pdf').classList.add('hidden');
   document.getElementById('btn-export-csv').classList.add('hidden');
+  document.getElementById('lead-rekap-history-search').classList.remove('hidden');
   const all = await dbGetAllLeadRekap();
   const mine = all.filter(r=>r.status==='finalized' && r.leadEvaluatorUsername===currentUser.username && !r.isDeleted)
     .sort((a,b)=> new Date(b.finalizedAt||b.createdAt) - new Date(a.finalizedAt||a.createdAt));
   leadRekapHistoryCache = mine;
+  renderLeadRekapHistoryList();
+}
+function renderLeadRekapHistoryList(){
+  const mine = leadRekapHistoryCache;
   const box=document.getElementById('report-preview');
+  if(!box) return;
   if(!mine.length){
     box.innerHTML = `<div class="empty"><p>Belum ada rekap yang diselesaikan. Buat lewat Beranda → pilih sesi → Mulai Rekap → selesaikan di Closing.</p></div>`;
     return;
   }
-  box.innerHTML = mine.map((r,idx)=>{
+  const term=(leadRekapHistorySearchTerm||'').trim().toLowerCase();
+  const tokens = term.split(/\s+/).filter(Boolean);
+  const filtered = mine.map((r,idx)=>({r,idx})).filter(({r})=>{
+    if(!tokens.length) return true;
+    const isHasil = r.mode!=='tindak_lanjut';
+    const tglStr = r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'full'}) : '';
+    const haystacks=[r.objekEvaluasi, r.leadEvaluator, r.auditeeName, isHasil?'hasil disetujui':'tindak lanjut selesai', tglStr]
+      .map(v=>String(v||'').toLowerCase());
+    return tokens.every(tok=>haystacks.some(h=>h.includes(tok)));
+  });
+  if(!filtered.length){
+    box.innerHTML = `<div class="empty"><p>Tidak ada rekap yang cocok dengan pencarian.</p></div>`;
+    return;
+  }
+  box.innerHTML = filtered.map(({r,idx})=>{
     const isHasil = r.mode!=='tindak_lanjut';
     const tgl = r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'medium'}) : '-';
     return `<div class="card" style="margin-bottom:12px;">
@@ -3695,9 +3743,19 @@ async function renderLeadRekapHistory(){
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
         <span class="icon-btn btn-sm" onclick="exportLeadRekapPdf(leadRekapHistoryCache[${idx}])">🖨 Ekspor PDF</span>
         <span class="icon-btn btn-sm" onclick="exportLeadRekapExcel(leadRekapHistoryCache[${idx}])">📊 Ekspor Excel</span>
+        <span class="icon-btn btn-sm" style="color:var(--major);border-color:#4a2226;" onclick="deleteLeadRekapHistoryItem(${idx})">🗑 Hapus</span>
       </div>
     </div>`;
   }).join('');
+}
+async function deleteLeadRekapHistoryItem(idx){
+  const r = leadRekapHistoryCache[idx];
+  if(!r) return;
+  askConfirm(`Hapus rekap "${r.objekEvaluasi}"? Sesi-sesi aslinya TIDAK ikut terhapus, hanya dokumen rekap gabungannya. Tindakan ini tidak dapat dibatalkan.`, async ()=>{
+    await dbDeleteLeadRekap(r.id);
+    toast('Rekap dihapus.');
+    renderLeadRekapHistory();
+  });
 }
 function renderLeadReportHasil(){
   document.getElementById('report-title').textContent='Rekap Hasil Evaluasi Kepatuhan';
