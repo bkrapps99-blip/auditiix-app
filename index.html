@@ -1196,13 +1196,21 @@ async function dbRawDeleteLeadRekap(id){
     });
   }catch(e){ return false; }
 }
+async function ensureConnected(){
+  if(!syncConfigured()) return false;
+  if(MASTER.accessToken) return true;
+  if(!currentUser) return false;
+  const hist=(MASTER.loginHistory||[]).find(h=>h.username===currentUser.username);
+  if(!hist) return false;
+  return await apiLogin(hist.username, hist.password);
+}
 async function pushUserToServer(user){
-  if(!syncConfigured() || !MASTER.accessToken) return;
+  if(!(await ensureConnected())) return;
   try{ await apiRequest('/users/'+encodeURIComponent(user.username), {method:'PUT', body: JSON.stringify(user)}); }
   catch(e){ console.warn('[sync] push user gagal', e); }
 }
 async function deleteUserFromServer(username){
-  if(!syncConfigured() || !MASTER.accessToken) return;
+  if(!(await ensureConnected())) return;
   try{ await apiRequest('/users/'+encodeURIComponent(username), {method:'DELETE'}); }catch(e){ console.warn('[sync] hapus user di server gagal', e); }
 }
 let standardsPushTimer=null;
