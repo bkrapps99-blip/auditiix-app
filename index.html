@@ -2100,7 +2100,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
       return;
     }
     const freeNav = nav==='home' || nav==='standards' || nav==='access' || nav==='rekap' || nav==='admin-findings' || nav==='settings';
-    if(!state.id && !freeNav){ toast('Pilih atau mulai sesi evaluasi kepatuhan terlebih dahulu di Beranda'); return; }
+    if(!state.id && !leadRekapDraft && !freeNav){ toast('Pilih atau mulai sesi evaluasi kepatuhan terlebih dahulu di Beranda'); return; }
     showScreen(nav);
   });
 });
