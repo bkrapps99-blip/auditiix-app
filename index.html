@@ -3669,7 +3669,7 @@ function renderLeadClosing(){
       <td style="padding:8px 10px;">${escapeHtml(r.unit)}</td>
       <td style="padding:8px 10px;">${escapeHtml(r.standar)}</td>
       <td style="padding:8px 10px;">${escapeHtml(r.evaluator)}</td>
-      <td style="padding:8px 10px;"><span class="sev-tag major">${r.open} OPEN</span> <span class="sev-tag ok">${r.close} CLOSE</span></td>
+      <td style="padding:8px 10px;">${r.open + r.close} Evaluasi</td>
       ${isHasil? `<td style="padding:8px 10px;">${r.ketaatan}%</td>` : ''}
     </tr>`).join('');
 
@@ -3679,7 +3679,7 @@ function renderLeadClosing(){
         <thead><tr style="text-align:left;color:var(--text-dim);font-family:var(--font-mono);font-size:10.5px;">
           <th style="padding:8px 10px;">NO. EVALUASI</th><th style="padding:8px 10px;">TANGGAL</th>
           <th style="padding:8px 10px;">OBJEK EVALUASI</th><th style="padding:8px 10px;">STANDAR</th>
-          <th style="padding:8px 10px;">EVALUATOR</th><th style="padding:8px 10px;">OPEN/CLOSE</th>
+          <th style="padding:8px 10px;">EVALUATOR</th><th style="padding:8px 10px;">JUMLAH EVALUASI</th>
           ${isHasil? '<th style="padding:8px 10px;">% KETAATAN</th>' : ''}
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
@@ -3741,14 +3741,14 @@ function buildLeadRekapTableHtml(showKetaatan){
       <td style="padding:6px 8px;">${escapeHtml(r.unit)}</td>
       <td style="padding:6px 8px;">${escapeHtml(r.standar)}</td>
       <td style="padding:6px 8px;">${escapeHtml(r.evaluator)}</td>
-      <td style="padding:6px 8px;white-space:nowrap;"><span class="sev-tag major">${r.open} OPEN</span> <span class="sev-tag ok">${r.close} CLOSE</span></td>
+      <td style="padding:6px 8px;">${r.open + r.close} Evaluasi</td>
       ${showKetaatan? `<td style="padding:6px 8px;">${r.ketaatan}%</td>` : ''}
     </tr>`).join('');
   return `<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:10px;">
     <thead><tr style="text-align:left;color:var(--text-dim);font-family:var(--font-mono);font-size:9.5px;">
       <th style="padding:6px 8px;">NO. EVALUASI</th><th style="padding:6px 8px;">TANGGAL</th>
       <th style="padding:6px 8px;">OBJEK EVALUASI</th><th style="padding:6px 8px;">STANDAR</th>
-      <th style="padding:6px 8px;">EVALUATOR</th><th style="padding:6px 8px;">OPEN/CLOSE</th>
+      <th style="padding:6px 8px;">EVALUATOR</th><th style="padding:6px 8px;">JUMLAH EVALUASI</th>
       ${showKetaatan? '<th style="padding:6px 8px;">% KETAATAN</th>' : ''}
     </tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
@@ -3969,11 +3969,11 @@ async function exportLeadRekapExcel(rekapRecord){
   const isHasil = r.mode!=='tindak_lanjut';
 
   const summaryHead = isHasil
-    ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close','% Ketaatan']
-    : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close'];
+    ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Jumlah Evaluasi','% Ketaatan']
+    : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Jumlah Evaluasi'];
   const summaryBody = r.rows.map(row=> isHasil
-    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, row.open, row.close, row.ketaatan+'%']
-    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, row.open, row.close]);
+    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open + row.close} Evaluasi`, row.ketaatan+'%']
+    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open + row.close} Evaluasi`]);
   const infoRows = [
     ['Objek Evaluasi Kepatuhan', r.objekEvaluasi],
     ['Lead Evaluator', r.leadEvaluator],
@@ -4120,11 +4120,11 @@ async function exportLeadRekapPdf(rekapRecord){
   doc.text(`Status: ${isHasil? 'Disetujui Evaluator & Pemilik' : 'Sesi evaluasi Kepatuhan ditutup'}`, 15, y); y+=8;
 
   const head = isHasil
-    ? [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Open/Close','% Ketaatan']]
-    : [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Open/Close']];
+    ? [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Jumlah Evaluasi','% Ketaatan']]
+    : [['No. Evaluasi','Tanggal','Objek Evaluasi','Standar','Evaluator','Jumlah Evaluasi']];
   const body = r.rows.map(row=> isHasil
-    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open} OPEN / ${row.close} CLOSE`, row.ketaatan+'%']
-    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open} OPEN / ${row.close} CLOSE`]);
+    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open + row.close} Evaluasi`, row.ketaatan+'%']
+    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, `${row.open + row.close} Evaluasi`]);
   if(typeof doc.autoTable==='function'){
     doc.autoTable({ head, body, startY:y, styles:{fontSize:8, cellPadding:2}, headStyles:{fillColor:[28,36,42], textColor:255} });
     y = doc.lastAutoTable.finalY + 12;
