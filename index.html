@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#12171B;
@@ -2001,8 +2002,7 @@ function applyRolePermissions(){
     const checklistBtn=document.querySelector('.navbtn[data-nav="checklist"]');
     const findingsBtn=document.querySelector('.navbtn[data-nav="findings"]');
     const closingBtn=document.querySelector('.navbtn[data-nav="closing"]');
-    const reportBtn=document.querySelector('.navbtn[data-nav="report"]');
-    [checklistBtn,findingsBtn,closingBtn,reportBtn].forEach(b=>{ if(b) b.classList.add('nav-disabled'); });
+    [checklistBtn,findingsBtn,closingBtn].forEach(b=>{ if(b) b.classList.add('nav-disabled'); });
     const inpLead=document.getElementById('lead-inp-nama');
     if(inpLead) inpLead.value = currentUser.fullName;
     resumeLeadDraftIfAny();
@@ -2100,7 +2100,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
       toast(nav==='checklist' ? 'Checklist terkunci karena sesi telah disetujui. Perubahan hanya lewat menu Evaluasi.' : 'Laporan menunggu persetujuan/tanda tangan Pemilik Proses di menu Closing.');
       return;
     }
-    const freeNav = nav==='home' || nav==='standards' || nav==='access' || nav==='rekap' || nav==='admin-findings' || nav==='settings';
+    const freeNav = nav==='home' || nav==='standards' || nav==='access' || nav==='rekap' || nav==='admin-findings' || nav==='settings' || (nav==='report' && currentUser.role==='lead');
     if(!state.id && !leadRekapDraft && !freeNav){ toast('Pilih atau mulai sesi evaluasi kepatuhan terlebih dahulu di Beranda'); return; }
     showScreen(nav);
   });
@@ -2437,7 +2437,7 @@ async function startLeadRekap(){
   if(checklistBtn) checklistBtn.classList.add('nav-disabled'); // checklist per-item hanya lewat Tinjau Evaluasi
   if(findingsBtn) findingsBtn.classList.remove('nav-disabled');
   if(closingBtn) closingBtn.classList.remove('nav-disabled');
-  if(reportBtn) reportBtn.classList.add('nav-disabled'); // aktif setelah Closing diselesaikan
+  // reportBtn sengaja tidak dikunci — Laporan (riwayat rekap) selalu bisa diakses Lead kapan saja
 
   toast('Rekap dimulai: '+sessions.length+' sesi digabung.');
   showScreen('findings');
@@ -3584,8 +3584,11 @@ function setReportTab(tab){
   renderReport();
 }
 function renderReport(){
-  if(currentUser.role==='lead' && leadRekapDraft){ renderLeadReport(); return; }
+  if(currentUser.role==='lead'){ renderLeadReport(); return; }
   document.getElementById('report-tab-select').classList.remove('hidden');
+  document.getElementById('btn-export-pdf').classList.remove('hidden');
+  document.getElementById('btn-export-csv').classList.remove('hidden');
+  document.getElementById('btn-export-csv').textContent='Ekspor Excel (CSV)';
   document.getElementById('tab-report-hasil').textContent='Laporan Hasil Evaluasi Kepatuhan';
   document.getElementById('tab-report-tindaklanjut').textContent='Laporan Tindak Lanjut Evaluasi Kepatuhan';
   if(reportTab==='tindak_lanjut'){ renderReportTindakLanjut(); return; }
@@ -3614,14 +3617,44 @@ function buildLeadRekapTableHtml(showKetaatan){
 function renderLeadReport(){
   document.getElementById('report-tab-select').classList.add('hidden');
   if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){
-    document.getElementById('report-title').textContent='Rekap Evaluasi Kepatuhan';
-    document.getElementById('report-subtitle').textContent='Selesaikan proses Closing terlebih dahulu untuk menerbitkan laporan rekap.';
-    document.getElementById('report-preview').innerHTML = `<div class="empty"><p>Belum ada rekap yang selesai/final.</p></div>`;
+    renderLeadRekapHistory();
     return;
   }
+  document.getElementById('btn-export-pdf').classList.remove('hidden');
+  document.getElementById('btn-export-csv').classList.remove('hidden');
   document.getElementById('report-subtitle').textContent='Laporan siap diekspor.';
+  document.getElementById('btn-export-csv').textContent='Ekspor Excel (XLSX)';
   if(leadRekapDraft.mode==='tindak_lanjut') renderLeadReportTindakLanjut();
   else renderLeadReportHasil();
+}
+let leadRekapHistoryCache=[];
+async function renderLeadRekapHistory(){
+  document.getElementById('report-title').textContent='Riwayat Rekap Evaluasi Kepatuhan';
+  document.getElementById('report-subtitle').textContent='Semua rekap yang pernah Anda selesaikan.';
+  document.getElementById('btn-export-pdf').classList.add('hidden');
+  document.getElementById('btn-export-csv').classList.add('hidden');
+  const all = await dbGetAllLeadRekap();
+  const mine = all.filter(r=>r.status==='finalized' && r.leadEvaluatorUsername===currentUser.username && !r.isDeleted)
+    .sort((a,b)=> new Date(b.finalizedAt||b.createdAt) - new Date(a.finalizedAt||a.createdAt));
+  leadRekapHistoryCache = mine;
+  const box=document.getElementById('report-preview');
+  if(!mine.length){
+    box.innerHTML = `<div class="empty"><p>Belum ada rekap yang diselesaikan. Buat lewat Beranda → pilih sesi → Mulai Rekap → selesaikan di Closing.</p></div>`;
+    return;
+  }
+  box.innerHTML = mine.map((r,idx)=>{
+    const isHasil = r.mode!=='tindak_lanjut';
+    const tgl = r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'medium'}) : '-';
+    return `<div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:14px;">${escapeHtml(r.objekEvaluasi)}</div>
+      <div style="font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">${isHasil?'Rekap Hasil':'Rekap Tindak Lanjut'} · ${r.rows.length} sesi · ${r.totalPoin} poin</div>
+      <div style="font-size:11px;color:var(--text-faint);font-family:var(--font-mono);margin-top:2px;">📅 ${tgl} · 👤 ${escapeHtml(r.auditeeName||'-')}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <span class="icon-btn btn-sm" onclick="exportLeadRekapPdf(leadRekapHistoryCache[${idx}])">🖨 Ekspor PDF</span>
+        <span class="icon-btn btn-sm" onclick="exportLeadRekapExcel(leadRekapHistoryCache[${idx}])">📊 Ekspor Excel</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 function renderLeadReportHasil(){
   document.getElementById('report-title').textContent='Rekap Hasil Evaluasi Kepatuhan';
@@ -3745,23 +3778,70 @@ function renderReportTindakLanjut(){
     ${rep.sigAuditor? `<div class="divider"></div><div style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">Tanda Tangan Evaluator</div><img src="${rep.sigAuditor}" style="max-width:200px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
 }
-document.getElementById('btn-export-csv').addEventListener('click', ()=>{
+// Nama sheet Excel maksimal 31 karakter & tidak boleh berisi \ / ? * [ ]
+function safeSheetName(name, usedNames){
+  let clean = String(name||'Sheet').replace(/[\\\/\?\*\[\]]/g,'-').slice(0,31);
+  let finalName = clean;
+  let i=2;
+  while(usedNames.has(finalName)){
+    const suffix=' ('+i+')';
+    finalName = clean.slice(0, 31-suffix.length)+suffix;
+    i++;
+  }
+  usedNames.add(finalName);
+  return finalName;
+}
+async function exportLeadRekapExcel(rekapRecord){
+  const r = rekapRecord || leadRekapDraft;
+  if(!r || r.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
+  if(typeof XLSX==='undefined'){ toast('Pustaka Excel belum siap, coba lagi sesaat'); return; }
+  const isHasil = r.mode!=='tindak_lanjut';
+
+  const summaryHead = isHasil
+    ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close','% Ketaatan']
+    : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close'];
+  const summaryBody = r.rows.map(row=> isHasil
+    ? [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, row.open, row.close, row.ketaatan+'%']
+    : [row.nomor, row.tanggal, row.unit, row.standar, row.evaluator, row.open, row.close]);
+  const infoRows = [
+    ['Objek Evaluasi Kepatuhan', r.objekEvaluasi],
+    ['Lead Evaluator', r.leadEvaluator],
+    ['Pemilik Proses', r.auditeeName||'-'],
+    [isHasil? 'Tanggal Pelaksanaan' : 'Tanggal Penyelesaian', isHasil? (r.finalizedAt? new Date(r.finalizedAt).toLocaleDateString('id-ID',{dateStyle:'long'}):'-') : (r.createdAt? new Date(r.createdAt).toLocaleDateString('id-ID',{dateStyle:'long'}):'-')],
+    ['Total poin diperiksa', r.totalPoin],
+    ['Status', isHasil? 'Disetujui Evaluator & Pemilik' : 'Sesi evaluasi Kepatuhan ditutup'],
+    [],
+  ];
+  const wb = XLSX.utils.book_new();
+  const wsSummary = XLSX.utils.aoa_to_sheet([...infoRows, summaryHead, ...summaryBody]);
+  const usedNames = new Set();
+  XLSX.utils.book_append_sheet(wb, wsSummary, safeSheetName(isHasil? 'Rekap Hasil':'Rekap Tindak Lanjut', usedNames));
+
+  let sessions = r._sessions;
+  if(!sessions){
+    const all = await dbGetAll();
+    sessions = all.filter(s=>(r.sessionIds||[]).includes(s.id));
+  }
+  sessions.forEach(s=>{
+    const findings = s.items.filter(i=>i.rating && i.rating!=='ok');
+    const head = ['Klausul','Item','Rating','Evaluasi','Rekomendasi'];
+    const body = findings.map(f=>[f.code, f.text, f.rating, f.note||'', f.recommendation||'']);
+    const sheetInfo = [
+      ['No. Evaluasi', s.nomor||'-'],
+      ['Objek Evaluasi Kepatuhan', s.unit],
+      ['Evaluator', s.auditor||'-'],
+      [],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([...sheetInfo, head, ...body]);
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(s.nomor || s.unit, usedNames));
+  });
+
+  XLSX.writeFile(wb, `ComplyShield_RekapLead_${(r.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.xlsx`);
+  toast('Excel rekap diunduh (rekap + laporan tiap sesi per sheet)');
+}
+document.getElementById('btn-export-csv').addEventListener('click', async ()=>{
   if(currentUser.role==='lead' && leadRekapDraft){
-    if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
-    const isHasil = leadRekapDraft.mode!=='tindak_lanjut';
-    const head = isHasil
-      ? ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close','% Ketaatan']
-      : ['No. Evaluasi Kepatuhan','Tanggal','Objek Evaluasi Kepatuhan','Standar','Evaluator','Open','Close'];
-    const body = leadRekapDraft.rows.map(r=> isHasil
-      ? [r.nomor, r.tanggal, r.unit, r.standar, r.evaluator, r.open, r.close, r.ketaatan+'%']
-      : [r.nomor, r.tanggal, r.unit, r.standar, r.evaluator, r.open, r.close]);
-    const csv=[head,...body].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=`ComplyShield_RekapLead_${(leadRekapDraft.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.csv`;
-    a.click();
-    toast('CSV rekap diunduh');
+    await exportLeadRekapExcel(leadRekapDraft);
     return;
   }
   if(reportTab==='tindak_lanjut'){
@@ -3797,10 +3877,59 @@ document.getElementById('btn-export-pdf').addEventListener('click', async ()=>{
   if(reportTab==='tindak_lanjut'){ await exportTindakLanjutPdf(); return; }
   await exportHasilAuditPdf();
 });
-async function exportLeadRekapPdf(){
-  if(!leadRekapDraft || leadRekapDraft.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
-  const isHasil = leadRekapDraft.mode!=='tindak_lanjut';
-  const r=leadRekapDraft;
+// Menggambar satu halaman laporan lengkap untuk SATU sesi (dipakai untuk lampiran di PDF Rekap Lead).
+async function drawSessionReportPageIntoPdf(doc, s){
+  doc.addPage();
+  drawPdfLogoHeader(doc);
+  const lib = MASTER.standards[s.standard];
+  const isFinalized = s.approvalStatus === 'finalized';
+  let y=23;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text(isFinalized? 'LAPORAN TINDAK LANJUT EVALUASI KEPATUHAN' : 'LAPORAN HASIL EVALUASI KEPATUHAN', 15, y);
+  if(!isFinalized){
+    try{
+      const ketaatanPct=computeKetaatanPct(s);
+      const dataUrl=doughnutDataUrl(ketaatanPct, 200, true);
+      doc.addImage(dataUrl,'PNG',172,8,24,24);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7);
+      doc.text('% KETAATAN', 184, 34, {align:'center'});
+    }catch(e){}
+  }
+  y+=7;
+  doc.setFontSize(10); doc.setFont('helvetica','normal');
+  if(s.nomor){ doc.text(`Nomor: ${s.nomor}`,15,y); y+=5; }
+  doc.text(`Objek Evaluasi Kepatuhan: ${s.unit}`,15,y); y+=5;
+  doc.text(`Standar: ${lib?lib.name:'-'}`,15,y); y+=5;
+  doc.text(`Evaluator: ${s.auditor||'-'}`,15,y); y+=5;
+  doc.text(`Pemilik Proses: ${auditeeDisplayName(s)}`,15,y); y+=5;
+  if(isFinalized){
+    const rep=s.followUpReport;
+    doc.text(`Tanggal Penyelesaian: ${rep && rep.completionDate? new Date(rep.completionDate).toLocaleDateString('id-ID',{dateStyle:'long'}):'-'}`,15,y); y+=9;
+  } else {
+    const tglPelaksanaan = s.approvedAt || s.createdAt;
+    doc.text(`Tanggal Pelaksanaan: ${new Date(tglPelaksanaan).toLocaleDateString('id-ID',{dateStyle:'long'})}`,15,y); y+=9;
+  }
+  doc.setFont('helvetica','bold'); doc.text('Evaluasi:',15,y); y+=6;
+  doc.setFont('helvetica','normal');
+  const findings=s.items.filter(i=>i.rating && i.rating!=='ok');
+  y=drawFindingsPdf(doc, y, findings, isFinalized);
+  const sigA = isFinalized? (s.followUpReport && s.followUpReport.sigAuditor) : s.sigAuditor;
+  const sigB = isFinalized? null : s.sigAuditee;
+  if(sigA || sigB){
+    if(y>230){ doc.addPage(); drawPdfLogoHeader(doc); y=28; }
+    y+=6; doc.setFont('helvetica','bold'); doc.text('Persetujuan:',15,y); y+=6;
+    if(sigA) await addSignatureToPdf(doc, sigA, 15, y, 60, 25);
+    if(sigB) await addSignatureToPdf(doc, sigB, 110, y, 60, 25);
+    y+=27;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text(`Evaluator: ${s.auditor||'-'}`,15,y);
+    if(sigB) doc.text(`Pemilik Proses: ${auditeeDisplayName(s)}`,110,y);
+  }
+}
+async function exportLeadRekapPdf(rekapRecord){
+  const r = rekapRecord || leadRekapDraft;
+  if(!r || r.status!=='finalized'){ toast('Selesaikan rekap terlebih dahulu sebelum ekspor.'); return; }
+  const isHasil = r.mode!=='tindak_lanjut';
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
   drawPdfLogoHeader(doc);
@@ -3833,9 +3962,23 @@ async function exportLeadRekapPdf(){
     body.forEach(row=>{ doc.text(row.join(' | '),15,y); y+=5; });
     y+=8;
   }
-  if(y>250){ doc.addPage(); y=20; }
+  if(y>240){ doc.addPage(); y=20; }
   doc.setFont('helvetica','bold'); doc.text('Tanda Tangan Lead Evaluator', 15, y); y+=3;
   await addSignatureToPdf(doc, r.sigLead, 15, y, 55, 25);
+  y+=27;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(r.leadEvaluator||'-', 15, y);
+
+  // Lampiran: halaman laporan lengkap untuk masing-masing sesi yang direkap
+  let sessions = r._sessions;
+  if(!sessions){
+    const all = await dbGetAll();
+    sessions = all.filter(s=>(r.sessionIds||[]).includes(s.id));
+  }
+  for(const s of sessions){
+    await drawSessionReportPageIntoPdf(doc, s);
+  }
+
   doc.save(`ComplyShield_RekapLead_${(r.objekEvaluasi||'rekap').replace(/[\/\s]+/g,'_')}.pdf`);
   toast('PDF rekap diunduh');
 }
