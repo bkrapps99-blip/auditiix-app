@@ -877,7 +877,7 @@ textarea.input{resize:vertical;min-height:64px;line-height:1.5;}
   </div>
 
   <div class="bottomnav">
-    <div id="sidebar-brand" style="display:none;">
+    <div id="sidebar-brand">
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="#0F1316" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z"/><path d="M8.5 12.2l2.4 2.4 4.6-5.1"/></svg>
       </div>
@@ -1822,28 +1822,13 @@ function togglePasswordVisibility(inputId, iconWrapId){
 /* ---------- Auth ---------- */
 let currentUser=null;
 let USERS=[];
+// Data awal HANYA untuk perangkat yang benar-benar baru (IndexedDB kosong) & belum pernah sinkron.
+// SENGAJA cuma berisi 1 akun Admin — daftar akun yang sesungguhnya (Evaluator/Lead/Pemilik Proses)
+// dikelola sepenuhnya lewat server (Kelola Akses), BUKAN ditanam di file ini, supaya:
+// (1) tidak ada password asli karyawan yang tersimpan sebagai teks polos di file yang di-hosting publik,
+// (2) akun yang dihapus lewat Kelola Akses tidak "hidup lagi" di perangkat baru.
 const DEFAULT_USERS=[
-  {username:'Admin', password:'admin', role:'admin', jabatan:'Administrator', fullName:'Administrator'},
-  {username:'tedik.m', password:'evaluator', role:'auditor', jabatan:'Asman MMRK', fullName:'Tedik Muntoha'},
-  {username:'bakrims', password:'evaluator', role:'auditor', jabatan:'Officer MMRK', fullName:'Mochammad Syaiful Bakri'},
-  {username:'fiina.nash', password:'evaluator', role:'auditor', jabatan:'Officer MMRK', fullName:'Fiina Nashrulloh'},
-  {username:'deni.k', password:'12345', role:'auditee', jabatan:'Asman System Owner', fullName:'Deni Kristanto'},
-  {username:'zainal.a', password:'12345', role:'auditee', jabatan:'Asman CBM', fullName:'Zainal Arif'},
-  {username:'m.fauzi.i', password:'12345', role:'auditee', jabatan:'Asman Sipil & Lingkungan', fullName:'Mochamad Fauzi Irfan'},
-  {username:'wahyu.a', password:'12345', role:'auditee', jabatan:'Asman K3 & Keamanan', fullName:'Wahyu Aditya'},
-  {username:'tripudji.l', password:'12345', role:'auditee', jabatan:'Asman Keuangan', fullName:'Tri Pudji Lestari'},
-  {username:'y.hanif.u', password:'12345', role:'auditee', jabatan:'Asman Pengadaan', fullName:'Yuwana Hanif Utomo'},
-  {username:'edi.p', password:'12345', role:'auditee', jabatan:'Asman SDM, Umum & CSR', fullName:'Edi Purnomo'},
-  {username:'andry.w', password:'12345', role:'auditee', jabatan:'Asman Rendal Operasi', fullName:'Andry Widyatama'},
-  {username:'a.ridwan', password:'12345', role:'auditee', jabatan:'Asman Produksi PLTA Remote', fullName:'Achmad Ridwan'},
-  {username:'ulil.ab', password:'12345', role:'auditee', jabatan:'Asman Rendal Pemeliharaan', fullName:'Ulil Absor'},
-  {username:'pujo.h', password:'12345', role:'auditee', jabatan:'Asman Inventori Kontrol,Kataloger&Gudang', fullName:'Pujo Hastono'},
-  {username:'dhimas.aap', password:'12345', role:'auditee', jabatan:'Asman Outage Management', fullName:'Dhimas Arya Andhika Putra'},
-  {username:'hasman.h', password:'12345', role:'auditee', jabatan:'Asman PLTA Distrik A', fullName:'Hasman Hasan'},
-  {username:'ibrahim.f', password:'12345', role:'auditee', jabatan:'Asman PLTA Distrik B', fullName:'Ibrahim Fahmi'},
-  {username:'supri.adi', password:'12345', role:'auditee', jabatan:'Asman PLTA Distrik C', fullName:'Supriadi'},
-  {username:'joko.s', password:'12345', role:'auditee', jabatan:'Asman PLTA Distrik D', fullName:'Joko Supriyono'},
-  {username:'sigit.y', password:'12345', role:'auditee', jabatan:'Asman PLTA Distrik E', fullName:'Sigit Yuwono'}
+  {username:'Admin', password:'Admin123!', role:'admin', jabatan:'Administrator', fullName:'Administrator'}
 ];
 let storageOk = true;
 function showStorageWarning(msg){
