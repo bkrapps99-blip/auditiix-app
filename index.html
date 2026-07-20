@@ -989,6 +989,45 @@ async function dbGetUsers(){
     });
   }catch(e){ return []; }
 }
+// Hapus akun HANYA di penyimpanan lokal (tidak memicu kirim perintah hapus lagi ke server) —
+// dipakai saat membersihkan akun yang server-nya sudah tidak punya sama sekali.
+async function dbRawDeleteUser(username){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('users','readwrite');
+      tx.objectStore('users').delete(username);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
+// Cocokkan penuh daftar akun lokal dengan daftar akun yang BENAR-BENAR ada di server —
+// akun lokal yang sudah tidak ada di server (mis. gagal terhapus dulu, sekarang ketinggalan)
+// otomatis dibuang. Cuma jalan untuk Admin karena endpoint daftar akun memang admin-only.
+async function reconcileLocalUsersWithServer(){
+  if(!currentUser || currentUser.role!=='admin' || !syncConfigured() || !MASTER.accessToken) return;
+  try{
+    const res = await apiRequest('/users', {method:'GET'});
+    if(!res.ok) return;
+    const serverUsers = await res.json();
+    const serverUsernames = new Set(serverUsers.map(u=>u.username));
+    const localUsers = await dbGetUsers();
+    let removed=0;
+    for(const u of localUsers){
+      if(!serverUsernames.has(u.username)){
+        await dbRawDeleteUser(u.username);
+        removed++;
+      }
+    }
+    if(removed>0){
+      USERS = await dbGetUsers();
+      if(typeof renderUsersManage==='function') renderUsersManage();
+      if(typeof renderAuditeeOptions==='function') renderAuditeeOptions();
+      toast(removed+' akun lokal yang sudah tidak ada di server otomatis dibersihkan.');
+    }
+  }catch(e){ console.warn('[sync] reconcile akun gagal', e); }
+}
 async function dbPutUser(user){
   try{
     const db=dbInstance||(dbInstance=await openDB());
@@ -1384,6 +1423,7 @@ async function runSync(){
       await saveMaster();
     }
     updateNetStatus('synced');
+    reconcileLocalUsersWithServer();
     if(typeof refreshVisibleScreenData==='function') refreshVisibleScreenData();
     if(typeof refreshNotifBadge==='function') refreshNotifBadge();
     if(typeof refreshSyncPanel==='function') refreshSyncPanel();
