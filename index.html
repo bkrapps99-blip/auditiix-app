@@ -1020,7 +1020,7 @@ async function dbDeleteUser(username){
     return new Promise((res)=>{
       const tx=db.transaction('users','readwrite');
       tx.objectStore('users').delete(username);
-      tx.oncomplete=()=>{ deleteUserFromServer(username); res(true); };
+      tx.oncomplete=()=>res(true);
       tx.onerror=()=>res(false);
     });
   }catch(e){ return false; }
@@ -1256,8 +1256,13 @@ async function pushUserToServer(user){
   catch(e){ console.warn('[sync] push user gagal', e); }
 }
 async function deleteUserFromServer(username){
-  if(!(await ensureConnected())) return;
-  try{ await apiRequest('/users/'+encodeURIComponent(username), {method:'DELETE'}); }catch(e){ console.warn('[sync] hapus user di server gagal', e); }
+  if(!syncConfigured()) return {ok:false, reason:'mode-lokal'};
+  if(!(await ensureConnected())) return {ok:false, reason:'belum-tersambung'};
+  try{
+    const res=await apiRequest('/users/'+encodeURIComponent(username), {method:'DELETE'});
+    if(res.ok) return {ok:true};
+    return {ok:false, reason:'server-menolak ('+res.status+')'};
+  }catch(e){ return {ok:false, reason:'jaringan bermasalah'}; }
 }
 let standardsPushTimer=null;
 function scheduleStandardsPush(){
@@ -4676,7 +4681,17 @@ function removeUser(username){
     openUserKeys.delete(username);
     renderUsersManage();
     renderAuditeeOptions();
-    toast('Akun dihapus');
+    if(!syncConfigured()){
+      toast('Akun dihapus (mode lokal, tidak ada server terhubung).');
+      return;
+    }
+    toast('Akun dihapus lokal, menghapus di server...');
+    const result = await deleteUserFromServer(username);
+    if(result.ok){
+      toast('Akun berhasil dihapus (lokal & server).');
+    } else {
+      toast('⚠️ Akun terhapus LOKAL saja, GAGAL terhapus di server ('+result.reason+'). Buka Pengaturan > Sinkronisasi Server untuk sambungkan, lalu hapus lagi kalau akun ini masih muncul di perangkat lain.');
+    }
   });
 }
 async function addUser(){
