@@ -2323,7 +2323,7 @@ document.getElementById('btn-start-audit').addEventListener('click', async ()=>{
   const auditeeUsername=document.getElementById('inp-auditee-select').value;
   if(!unit){ toast('Isi objek evaluasi kepatuhan terlebih dahulu'); return; }
   if(!selectedStandard){ toast('Pilih standar/kerangka acuan'); return; }
-  if(!auditeeUsername){ toast('Pilih auditee penanggung jawab tindak lanjut'); return; }
+  if(!auditeeUsername){ toast('Pilih Pemilik Proses penanggung jawab tindak lanjut'); return; }
 
   const lib=MASTER.standards[selectedStandard];
   if(!lib || !lib.items.length){ toast('Standar ini belum memiliki poin checklist. Lengkapi lewat menu Standar.'); return; }
@@ -3570,7 +3570,7 @@ function renderClosing(){
           </button>
         </div>
         <div class="card">
-          <div class="sig-label"><b>Tanda Tangan Auditee</b><span class="icon-btn btn-sm" onclick="clearSig('sig-auditee', ()=>{const b=document.getElementById('btn-approve-rec'); if(b) b.disabled=true;})">Hapus</span></div>
+          <div class="sig-label"><b>Tanda Tangan Pemilik Proses</b><span class="icon-btn btn-sm" onclick="clearSig('sig-auditee', ()=>{const b=document.getElementById('btn-approve-rec'); if(b) b.disabled=true;})">Hapus</span></div>
           <canvas class="sig-pad" id="sig-auditee"></canvas>
         </div>
         <div class="btn-row">
@@ -3617,7 +3617,7 @@ function renderClosing(){
       box.innerHTML = `
         ${renderClosingSummaryCard()}
         <div class="card">
-          <div class="sig-label"><b>Tanda Tangan Auditor</b><span class="icon-btn btn-sm" onclick="clearSig('sig-auditor', ()=>{const b=document.getElementById('btn-send-approval'); if(b) b.disabled=true;})">Hapus</span></div>
+          <div class="sig-label"><b>Tanda Tangan Evaluator</b><span class="icon-btn btn-sm" onclick="clearSig('sig-auditor', ()=>{const b=document.getElementById('btn-send-approval'); if(b) b.disabled=true;})">Hapus</span></div>
           <canvas class="sig-pad" id="sig-auditor"></canvas>
         </div>
         <button class="btn btn-teal" id="btn-send-approval" disabled onclick="sendForApproval()">Kirim persetujuan ke Pemilik Proses</button>
@@ -3664,7 +3664,7 @@ async function requestRecommendationChange(){
   state.approvalStatus='draft';
   await dbPut(state);
   if(state.auditorUsername){
-    await pushNotification(state.auditorUsername, state.id, `Auditee mengajukan perubahan rekomendasi pada sesi "${state.unit}" (${state.nomor||''}): ${text}`, 'closing');
+    await pushNotification(state.auditorUsername, state.id, `${currentUser.fullName} (Pemilik Proses) mengajukan perubahan rekomendasi pada sesi "${state.unit}" (${state.nomor||''}): ${text}`, 'closing');
   }
   toast('Pengajuan perubahan dikirim ke Evaluator');
   updateSessionLock();
@@ -3673,7 +3673,7 @@ async function requestRecommendationChange(){
 }
 async function sendForApproval(){
   if(state.items.some(i=>!i.rating)){ toast('Masih ada poin checklist yang belum dinilai'); }
-  if(!state.auditeeUsername){ toast('Sesi ini belum memiliki auditee yang ditetapkan'); return; }
+  if(!state.auditeeUsername){ toast('Sesi ini belum memiliki Pemilik Proses yang ditetapkan'); return; }
   const canvas=document.getElementById('sig-auditor');
   if(canvas) state.sigAuditor = cropSignatureDataUrl(canvas);
   if(!state.closingLog) state.closingLog=[];
