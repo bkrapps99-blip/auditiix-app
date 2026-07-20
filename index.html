@@ -1000,6 +1000,20 @@ async function dbPutUser(user){
     });
   }catch(e){ return false; }
 }
+// Simpan data user lokal TANPA mendorong balik ke server — dipakai saat data ini justru
+// baru saja diterima DARI server (mis. saat login berhasil server-side), supaya tidak ada
+// pengiriman bolak-balik yang tidak perlu.
+async function dbRawPutUser(user){
+  try{
+    const db=dbInstance||(dbInstance=await openDB());
+    return new Promise((res)=>{
+      const tx=db.transaction('users','readwrite');
+      tx.objectStore('users').put(user);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
 async function dbDeleteUser(username){
   try{
     const db=dbInstance||(dbInstance=await openDB());
@@ -1093,16 +1107,27 @@ async function apiRequest(path, opts={}){
 }
 
 async function apiLogin(username, password){
-  if(!syncConfigured()) return false;
+  const r = await apiLoginDetailed(username, password);
+  return r.ok;
+}
+// Versi rinci: membedakan "server bilang password salah" (reason:'invalid') dari
+// "server tidak terjangkau/offline" (reason:'network') — supaya alur login tahu kapan harus
+// percaya jawaban server sepenuhnya, dan kapan harus jatuh ke pengecekan lokal.
+async function apiLoginDetailed(username, password){
+  if(!syncConfigured()) return {ok:false, reason:'unconfigured'};
+  if(!navigator.onLine) return {ok:false, reason:'network'};
   try{
     const res = await fetch(apiBaseUrl()+'/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password})});
-    if(!res.ok) return false;
+    if(!res.ok){
+      if(res.status===401) return {ok:false, reason:'invalid'};
+      return {ok:false, reason:'network'};
+    }
     const data = await res.json();
     MASTER.accessToken = data.accessToken;
     MASTER.refreshToken = data.refreshToken;
     await saveMaster();
-    return true;
-  }catch(e){ console.warn('[sync] login server gagal', e); return false; }
+    return {ok:true, data};
+  }catch(e){ console.warn('[sync] login server gagal', e); return {ok:false, reason:'network'}; }
 }
 
 async function apiRefreshToken(){
@@ -1861,9 +1886,32 @@ async function attemptLogin(){
     if(!storageOk){ showLoginError('Penyimpanan lokal bermasalah — lihat pesan merah di atas. Aplikasi belum bisa dipakai sampai ini teratasi.'); return; }
     if(!username || !password){ showLoginError('Isi username dan kata sandi.'); return; }
     if(!USERS.length){ await loadUsers(); }
-    const u=findUser(username);
+
+    let u=findUser(username);
+    let serverConfirmed=false;
+
+    // Prioritas 1: kalau online & server terkonfigurasi, percaya jawaban SERVER — supaya
+    // perangkat baru / password yang baru diganti di tempat lain langsung dikenali tanpa
+    // perlu tahu "password bawaan" duluan.
+    if(syncConfigured() && navigator.onLine){
+      const result = await apiLoginDetailed(username, password);
+      if(result.ok){
+        serverConfirmed=true;
+        const sd=result.data.user;
+        await dbRawPutUser({ username: sd.username, role: sd.role, jabatan: sd.jabatan, fullName: sd.fullName, password, isActive: true });
+        USERS = await dbGetUsers();
+        u=findUser(username);
+      } else if(result.reason==='invalid'){
+        showLoginError('Kata sandi salah untuk username tersebut.');
+        return;
+      }
+      // reason 'network'/'unconfigured' -> lanjut ke jalur cadangan (cek lokal) di bawah.
+    }
+
+    // Prioritas 2 (cadangan saat offline / server tak terjangkau): cek data lokal seperti biasa.
     if(!u){ showLoginError(`Username "${username}" tidak ditemukan.`); return; }
-    if(u.password!==password){ showLoginError('Kata sandi salah untuk username tersebut.'); return; }
+    if(!serverConfirmed && u.password!==password){ showLoginError('Kata sandi salah untuk username tersebut.'); return; }
+
     // Akun Admin bisa langsung masuk cukup dengan username & password, tanpa perlu pilih Mode Login.
     if(u.role!=='admin'){
       if(!loginRole){ showLoginError('Pilih mode login (Evaluator/Lead/Pemilik Proses) terlebih dahulu.'); return; }
@@ -1878,7 +1926,9 @@ async function attemptLogin(){
     await saveMaster();
     document.getElementById('login-username').value='';
     document.getElementById('login-password').value='';
-    if(syncConfigured()){
+    if(serverConfirmed){
+      runSync();
+    } else if(syncConfigured()){
       apiLogin(username, password).then(ok=>{ if(ok) runSync(); }).catch(()=>{});
     }
     enterApp();
